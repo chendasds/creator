@@ -1,0 +1,75 @@
+package com.creation.platform.controller;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.creation.platform.entity.Artwork;
+import com.creation.platform.service.ArtworkService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/artwork")
+public class ArtworkController {
+
+    @Autowired
+    private ArtworkService artworkService;
+
+    @GetMapping("/{id}")
+    public Artwork getById(@PathVariable Long id) {
+        return artworkService.getById(id);
+    }
+
+    @GetMapping("/list")
+    public List<Artwork> list() {
+        return artworkService.list();
+    }
+
+    @GetMapping("/page")
+    public Page<Artwork> page(
+            @RequestParam(defaultValue = "1") Integer current,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Integer status) {
+        Page<Artwork> page = new Page<>(current, size);
+        LambdaQueryWrapper<Artwork> wrapper = new LambdaQueryWrapper<>();
+        if (userId != null) {
+            wrapper.eq(Artwork::getUserId, userId);
+        }
+        if (categoryId != null) {
+            wrapper.eq(Artwork::getCategoryId, categoryId);
+        }
+        if (status != null) {
+            wrapper.eq(Artwork::getStatus, status);
+        }
+        wrapper.orderByDesc(Artwork::getCreateTime);
+        return artworkService.page(page, wrapper);
+    }
+
+    @PostMapping
+    public boolean save(@RequestBody Artwork artwork) {
+        return artworkService.save(artwork);
+    }
+
+    @PutMapping
+    public boolean updateById(@RequestBody Artwork artwork) {
+        return artworkService.updateById(artwork);
+    }
+
+    @DeleteMapping("/{id}")
+    public boolean removeById(@PathVariable Long id) {
+        return artworkService.removeById(id);
+    }
+
+    @PutMapping("/view/{id}")
+    public boolean incrementViewCount(@PathVariable Long id) {
+        Artwork artwork = artworkService.getById(id);
+        if (artwork != null) {
+            artwork.setViewCount(artwork.getViewCount() + 1);
+            return artworkService.updateById(artwork);
+        }
+        return false;
+    }
+}
