@@ -8,6 +8,9 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.List;
+import java.util.Map;
+
 @Mapper
 public interface ArtworkMapper extends BaseMapper<Artwork> {
 
@@ -31,4 +34,14 @@ public interface ArtworkMapper extends BaseMapper<Artwork> {
                                       @Param("title") String title,
                                       @Param("categoryId") Long categoryId,
                                       @Param("status") Integer status);
+
+    /**
+     * 查询分类占比数据
+     */
+    List<Map<String, Object>> selectCategoryRatio();
+
+    /**
+     * 查询七日趋势数据
+     */
+    List<Map<String, Object>> selectTrendData();
 }
