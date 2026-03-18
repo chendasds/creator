@@ -3,7 +3,22 @@ package com.creation.platform.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.creation.platform.entity.Category;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface CategoryMapper extends BaseMapper<Category> {
+
+    /**
+     * 穿透查询，无视逻辑删除
+     */
+    @Select("SELECT * FROM category WHERE name = #{name}")
+    Category selectByNameIgnoreLogicDelete(@Param("name") String name);
+
+    /**
+     * 彻底绕过逻辑删除插件，强制更新 is_deleted 为 0
+     */
+    @Update("UPDATE category SET is_deleted = 0, description = #{description}, sort_order = #{sortOrder}, update_time = #{updateTime} WHERE id = #{id}")
+    int resurrectCategory(Category category);
 }

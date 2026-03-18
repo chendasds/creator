@@ -3,6 +3,7 @@ package com.creation.platform.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.creation.platform.entity.Category;
+import com.creation.platform.entity.Result;
 import com.creation.platform.service.CategoryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -17,35 +18,35 @@ public class CategoryController {
     private CategoryService categoryService;
 
     @GetMapping("/{id}")
-    public Category getById(@PathVariable Long id) {
-        return categoryService.getById(id);
+    public Result<Category> getById(@PathVariable Long id) {
+        return Result.success(categoryService.getById(id));
     }
 
     @GetMapping("/list")
-    public List<Category> list() {
-        return categoryService.list(new LambdaQueryWrapper<Category>().orderByAsc(Category::getSortOrder));
+    public Result<List<Category>> list() {
+        return Result.success(categoryService.list(new LambdaQueryWrapper<Category>().orderByAsc(Category::getSortOrder)));
     }
 
     @GetMapping("/page")
-    public Page<Category> page(
+    public Result<Page<Category>> page(
             @RequestParam(defaultValue = "1") Integer current,
             @RequestParam(defaultValue = "10") Integer size) {
         Page<Category> page = new Page<>(current, size);
-        return categoryService.page(page, new LambdaQueryWrapper<Category>().orderByAsc(Category::getSortOrder));
+        return Result.success(categoryService.page(page, new LambdaQueryWrapper<Category>().orderByAsc(Category::getSortOrder)));
     }
 
     @PostMapping
-    public boolean save(@RequestBody Category category) {
-        return categoryService.save(category);
+    public Result<Boolean> save(@RequestBody Category category) {
+        return Result.success(categoryService.saveWithRecovery(category));
     }
 
     @PutMapping
-    public boolean updateById(@RequestBody Category category) {
-        return categoryService.updateById(category);
+    public Result<Boolean> updateById(@RequestBody Category category) {
+        return Result.success(categoryService.updateById(category));
     }
 
     @DeleteMapping("/{id}")
-    public boolean removeById(@PathVariable Long id) {
-        return categoryService.removeById(id);
+    public Result<Boolean> removeById(@PathVariable Long id) {
+        return Result.success(categoryService.removeById(id));
     }
 }

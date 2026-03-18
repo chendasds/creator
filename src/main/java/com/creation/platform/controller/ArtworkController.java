@@ -3,7 +3,9 @@ package com.creation.platform.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.creation.platform.entity.Artwork;
+import com.creation.platform.entity.Result;
 import com.creation.platform.service.ArtworkService;
+import com.creation.platform.vo.ArtworkVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -71,5 +73,19 @@ public class ArtworkController {
             return artworkService.updateById(artwork);
         }
         return false;
+    }
+
+    /**
+     * 后台管理作品分页查询
+     */
+    @GetMapping("/admin/page")
+    public Result<Page<ArtworkVO>> adminPage(
+            @RequestParam(defaultValue = "1") Integer current,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Integer status) {
+        Page<ArtworkVO> page = artworkService.getAdminArtworkPage(current, size, title, categoryId, status);
+        return Result.success(page);
     }
 }
