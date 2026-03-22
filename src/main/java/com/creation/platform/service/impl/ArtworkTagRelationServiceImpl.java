@@ -16,18 +16,16 @@ public class ArtworkTagRelationServiceImpl extends ServiceImpl<ArtworkTagRelatio
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean setTags(Long artworkId, List<Long> tagIds) {
-        // 删除原有关联
+        // 删除原有关联 (逻辑删除)
         LambdaQueryWrapper<ArtworkTagRelation> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ArtworkTagRelation::getArtworkId, artworkId);
         this.remove(wrapper);
 
-        // 添加新关联
+        // 添加或恢复关联
         if (tagIds != null && !tagIds.isEmpty()) {
             for (Long tagId : tagIds) {
-                ArtworkTagRelation relation = new ArtworkTagRelation();
-                relation.setArtworkId(artworkId);
-                relation.setTagId(tagId);
-                this.save(relation);
+                // 使用 ON DUPLICATE KEY UPDATE 完美避开唯一索引冲突
+                baseMapper.insertOrRecover(artworkId, tagId);
             }
         }
         return true;

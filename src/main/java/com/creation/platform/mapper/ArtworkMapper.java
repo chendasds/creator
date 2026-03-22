@@ -48,9 +48,11 @@ public interface ArtworkMapper extends BaseMapper<Artwork> {
         List<Map<String, Object>> selectTrendData();
 
         /**
-         * 公开作品流分页查询（status=1 且 is_deleted=0，按时间倒序）
+         * 公开作品流分页查询（status=1 且 is_deleted=0，按时间倒序，支持标签过滤）
+         * 使用 EXISTS 子查询过滤标签，避免连表导致的分页总数错误
          */
-        @Select("SELECT a.id, a.title, a.cover_url, a.description, a.view_count, a.word_count, a.status, a.create_time, "
+        @Select("<script>" +
+                "SELECT a.id, a.title, a.cover_url, a.description, a.view_count, a.word_count, a.status, a.create_time, "
                 + "u.nickname AS authorName, "
                 + "c.name AS categoryName, "
                 + "(SELECT COUNT(*) FROM user_interaction ui WHERE ui.artwork_id = a.id AND ui.interaction_type = 1 AND ui.is_deleted = 0) AS likeCount, "
@@ -60,8 +62,12 @@ public interface ArtworkMapper extends BaseMapper<Artwork> {
                 + "LEFT JOIN user u ON a.user_id = u.id "
                 + "LEFT JOIN category c ON a.category_id = c.id "
                 + "WHERE a.status = 1 AND a.is_deleted = 0 "
-                + "ORDER BY a.create_time DESC")
-        Page<ArtworkVO> selectFeedPage(Page<ArtworkVO> page);
+                + "<if test='tagId != null'> "
+                + "AND EXISTS (SELECT 1 FROM artwork_tag_relation atr WHERE atr.artwork_id = a.id AND atr.tag_id = #{tagId} AND atr.is_deleted = 0) "
+                + "</if>"
+                + "ORDER BY a.create_time DESC"
+                + "</script>")
+        Page<ArtworkVO> selectFeedPage(Page<ArtworkVO> page, @Param("tagId") Long tagId);
 
         /**
          * 根据ID查询作品详情（联表查询作者名和分类名，包含正文内容）

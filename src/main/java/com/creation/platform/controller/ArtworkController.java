@@ -34,13 +34,15 @@ public class ArtworkController {
      *
      * @param current 当前页码，默认第1页
      * @param size    每页数量，默认10条
+     * @param tagId   标签ID（可选，为 null 时返回全部作品）
      * @return 分页后的作品列表（包含作者昵称和分类名称）
      */
     @GetMapping("/feed")
     public Result<Page<ArtworkVO>> getFeed(
             @RequestParam(defaultValue = "1") Integer current,
-            @RequestParam(defaultValue = "10") Integer size) {
-        Page<ArtworkVO> page = artworkService.getFeedPage(current, size);
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) Long tagId) {
+        Page<ArtworkVO> page = artworkService.getFeedPage(current, size, tagId);
         return Result.success(page);
     }
 

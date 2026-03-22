@@ -2,6 +2,8 @@ package com.creation.platform.dto;
 
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * 作品发布 DTO
  */
@@ -37,4 +39,9 @@ public class ArtworkPublishDTO {
      * 作品状态: 1-已发布 0-草稿
      */
     private Integer status;
+
+    /**
+     * 关联的标签ID集合
+     */
+    private List<Long> tagIds;
 }

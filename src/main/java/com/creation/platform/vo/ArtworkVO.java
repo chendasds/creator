@@ -3,6 +3,7 @@ package com.creation.platform.vo;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class ArtworkVO {
@@ -80,4 +81,9 @@ public class ArtworkVO {
      * 该作品评论数
      */
     private Integer commentCount;
+
+    /**
+     * 作品关联的标签列表（关联查询结果）
+     */
+    private List<com.creation.platform.entity.Tag> tags;
 }
