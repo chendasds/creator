@@ -2,6 +2,7 @@ package com.creation.platform.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.creation.platform.dto.UserUpdateDTO;
 import com.creation.platform.entity.User;
 import com.creation.platform.mapper.UserMapper;
 import com.creation.platform.service.UserService;
@@ -56,5 +57,32 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 密码设为null，防止泄露
         user.setPassword(null);
         return user;
+    }
+
+    @Override
+    public User getProfile(Long userId) {
+        User user = this.getById(userId);
+        if (user != null) {
+            user.setPassword(null);
+        }
+        return user;
+    }
+
+    @Override
+    public boolean updateProfile(Long userId, UserUpdateDTO dto) {
+        User user = this.getById(userId);
+        if (user == null) {
+            return false;
+        }
+        if (dto.getNickname() != null) {
+            user.setNickname(dto.getNickname());
+        }
+        if (dto.getEmail() != null) {
+            user.setEmail(dto.getEmail());
+        }
+        if (dto.getAvatarUrl() != null) {
+            user.setAvatarUrl(dto.getAvatarUrl());
+        }
+        return this.updateById(user);
     }
 }

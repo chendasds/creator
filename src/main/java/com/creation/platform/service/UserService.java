@@ -9,6 +9,7 @@
 package com.creation.platform.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.creation.platform.dto.UserUpdateDTO;
 import com.creation.platform.entity.User;
 
 public interface UserService extends IService<User> {
@@ -28,4 +29,19 @@ public interface UserService extends IService<User> {
      * @return 登录成功返回用户信息，密码设为null；失败返回null
      */
     User login(String username, String password);
+
+    /**
+     * 获取个人资料（脱敏）
+     * @param userId 用户ID
+     * @return 脱敏后的用户信息（密码为null）
+     */
+    User getProfile(Long userId);
+
+    /**
+     * 更新个人资料
+     * @param userId 用户ID
+     * @param dto 更新信息
+     * @return 是否更新成功
+     */
+    boolean updateProfile(Long userId, UserUpdateDTO dto);
 }

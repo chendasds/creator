@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.creation.platform.mapper.CommentMapper">
+
+    <!-- 查询评论列表并关联用户信息（昵称、头像） -->
+    <select id="selectCommentListWithUser" resultType="com.creation.platform.vo.CommentVO">
+        SELECT
+            c.id,
+            c.artwork_id AS artworkId,
+            c.user_id AS userId,
+            c.parent_id AS parentId,
+            c.content,
+            c.create_time AS createTime,
+            c.update_time AS updateTime,
+            u.nickname AS authorName,
+            u.avatar_url AS authorAvatar,
+            pu.nickname AS replyToName
+        FROM comment c
+        LEFT JOIN user u ON c.user_id = u.id
+        LEFT JOIN comment pc ON c.parent_id = pc.id
+        LEFT JOIN user pu ON pc.user_id = pu.id
+        WHERE c.artwork_id = #{artworkId} AND c.is_deleted = 0
+        ORDER BY c.create_time ASC
+    </select>
+
+</mapper>

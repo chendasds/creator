@@ -50,4 +50,34 @@ public class ArtworkVO {
      * 分类名称（联表查询结果）
      */
     private String categoryName;
+
+    /**
+     * 作品正文内容
+     */
+    private String content;
+
+    /**
+     * 当前用户是否已点赞
+     */
+    private Boolean isLiked;
+
+    /**
+     * 当前用户是否已收藏
+     */
+    private Boolean isCollected;
+
+    /**
+     * 该作品总点赞数
+     */
+    private Integer likeCount;
+
+    /**
+     * 该作品总收藏数
+     */
+    private Integer collectCount;
+
+    /**
+     * 该作品评论数
+     */
+    private Integer commentCount;
 }

@@ -10,10 +10,12 @@ package com.creation.platform.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.creation.platform.dto.ArtworkPublishDTO;
 import com.creation.platform.entity.Artwork;
 import com.creation.platform.entity.Result;
 import com.creation.platform.service.ArtworkService;
 import com.creation.platform.vo.ArtworkVO;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,6 +27,40 @@ public class ArtworkController {
 
     @Autowired
     private ArtworkService artworkService;
+
+    /**
+     * 公开作品流接口
+     * 查询所有已发布(status=1)且未删除(is_deleted=0)的作品，按时间倒序分页返回
+     *
+     * @param current 当前页码，默认第1页
+     * @param size    每页数量，默认10条
+     * @return 分页后的作品列表（包含作者昵称和分类名称）
+     */
+    @GetMapping("/feed")
+    public Result<Page<ArtworkVO>> getFeed(
+            @RequestParam(defaultValue = "1") Integer current,
+            @RequestParam(defaultValue = "10") Integer size) {
+        Page<ArtworkVO> page = artworkService.getFeedPage(current, size);
+        return Result.success(page);
+    }
+
+    /**
+     * 作品详情接口
+     * 根据ID查询作品详情，同时将浏览量+1，并返回当前用户的点赞/收藏状态
+     *
+     * @param request HTTP请求（用于获取当前登录用户ID）
+     * @param id      作品ID
+     * @return 作品详情（包含作者昵称、分类名称、点赞/收藏状态）
+     */
+    @GetMapping("/detail/{id}")
+    public Result<ArtworkVO> getDetail(HttpServletRequest request, @PathVariable Long id) {
+        Long userId = (Long) request.getAttribute("userId");
+        ArtworkVO artworkVO = artworkService.getArtworkDetail(id, userId);
+        if (artworkVO == null) {
+            return Result.error("作品不存在");
+        }
+        return Result.success(artworkVO);
+    }
 
     @GetMapping("/{id}")
     public Artwork getById(@PathVariable Long id) {
@@ -109,5 +145,20 @@ public class ArtworkController {
         artwork.setStatus(targetStatus);
         boolean result = artworkService.updateById(artwork);
         return Result.success(result);
+    }
+
+    /**
+     * 发布作品接口
+     * 需要登录，从 JWT 中获取当前用户ID
+     *
+     * @param request HTTP请求（用于获取当前登录用户ID）
+     * @param dto     发布信息DTO
+     * @return 新增成功后的作品ID
+     */
+    @PostMapping("/publish")
+    public Result<Long> publish(HttpServletRequest request, @RequestBody ArtworkPublishDTO dto) {
+        Long userId = (Long) request.getAttribute("userId");
+        Long artworkId = artworkService.publishArtwork(userId, dto);
+        return Result.success(artworkId);
     }
 }

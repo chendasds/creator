@@ -1,14 +1,19 @@
 package com.creation.platform.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.creation.platform.dto.ArtworkPublishDTO;
 import com.creation.platform.entity.Artwork;
+import com.creation.platform.entity.UserInteraction;
 import com.creation.platform.mapper.ArtworkMapper;
+import com.creation.platform.mapper.UserInteractionMapper;
 import com.creation.platform.mapper.UserMapper;
 import com.creation.platform.service.ArtworkService;
 import com.creation.platform.vo.ArtworkVO;
 import com.creation.platform.vo.DashboardVO;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -28,10 +33,59 @@ public class ArtworkServiceImpl extends ServiceImpl<ArtworkMapper, Artwork> impl
     @Autowired
     private UserMapper userMapper;
 
+    @Autowired
+    private UserInteractionMapper userInteractionMapper;
+
     @Override
     public Page<ArtworkVO> getAdminArtworkPage(Integer current, Integer size, String title, Long categoryId, Integer status) {
         Page<ArtworkVO> page = new Page<>(current, size);
         return artworkMapper.selectArtworkPage(page, title, categoryId, status);
+    }
+
+    @Override
+    public Page<ArtworkVO> getFeedPage(Integer current, Integer size) {
+        Page<ArtworkVO> page = new Page<>(current, size);
+        return artworkMapper.selectFeedPage(page);
+    }
+
+    @Override
+    public ArtworkVO getArtworkDetail(Long id, Long userId) {
+        ArtworkVO artworkVO = artworkMapper.selectDetailById(id);
+        if (artworkVO == null) {
+            return null;
+        }
+
+        artworkVO.setViewCount(artworkVO.getViewCount() + 1);
+        Artwork artwork = new Artwork();
+        artwork.setId(id);
+        artwork.setViewCount(artworkVO.getViewCount());
+        artworkMapper.updateById(artwork);
+
+        if (userId != null) {
+            LambdaQueryWrapper<UserInteraction> likedWrapper = new LambdaQueryWrapper<>();
+            likedWrapper.eq(UserInteraction::getUserId, userId)
+                    .eq(UserInteraction::getArtworkId, id)
+                    .eq(UserInteraction::getInteractionType, 1);
+            artworkVO.setIsLiked(userInteractionMapper.selectCount(likedWrapper) > 0);
+
+            LambdaQueryWrapper<UserInteraction> collectedWrapper = new LambdaQueryWrapper<>();
+            collectedWrapper.eq(UserInteraction::getUserId, userId)
+                    .eq(UserInteraction::getArtworkId, id)
+                    .eq(UserInteraction::getInteractionType, 2);
+            artworkVO.setIsCollected(userInteractionMapper.selectCount(collectedWrapper) > 0);
+        }
+
+        LambdaQueryWrapper<UserInteraction> likeCountWrapper = new LambdaQueryWrapper<>();
+        likeCountWrapper.eq(UserInteraction::getArtworkId, id)
+                .eq(UserInteraction::getInteractionType, 1);
+        artworkVO.setLikeCount(userInteractionMapper.selectCount(likeCountWrapper).intValue());
+
+        LambdaQueryWrapper<UserInteraction> collectCountWrapper = new LambdaQueryWrapper<>();
+        collectCountWrapper.eq(UserInteraction::getArtworkId, id)
+                .eq(UserInteraction::getInteractionType, 2);
+        artworkVO.setCollectCount(userInteractionMapper.selectCount(collectCountWrapper).intValue());
+
+        return artworkVO;
     }
 
     @Override
@@ -89,5 +143,18 @@ public class ArtworkServiceImpl extends ServiceImpl<ArtworkMapper, Artwork> impl
         vo.setTrendData(trendData);
 
         return vo;
+    }
+
+    @Override
+    public Long publishArtwork(Long userId, ArtworkPublishDTO dto) {
+        Artwork artwork = new Artwork();
+        BeanUtils.copyProperties(dto, artwork);
+        artwork.setUserId(userId);
+        artwork.setViewCount(0);
+        if (dto.getContent() != null) {
+            artwork.setWordCount(dto.getContent().length());
+        }
+        artworkMapper.insert(artwork);
+        return artwork.getId();
     }
 }
