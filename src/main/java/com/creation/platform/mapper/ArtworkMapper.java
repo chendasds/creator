@@ -48,7 +48,7 @@ public interface ArtworkMapper extends BaseMapper<Artwork> {
         List<Map<String, Object>> selectTrendData();
 
         /**
-         * 公开作品流分页查询（status=1 且 is_deleted=0，按时间倒序，支持标签过滤）
+         * 公开作品流分页查询（status=1 且 is_deleted=0，按时间倒序，支持标签和分类过滤）
          * 使用 EXISTS 子查询过滤标签，避免连表导致的分页总数错误
          */
         @Select("<script>" +
@@ -62,12 +62,13 @@ public interface ArtworkMapper extends BaseMapper<Artwork> {
                 + "LEFT JOIN user u ON a.user_id = u.id "
                 + "LEFT JOIN category c ON a.category_id = c.id "
                 + "WHERE a.status = 1 AND a.is_deleted = 0 "
+                + "<if test='categoryId != null'> AND a.category_id = #{categoryId} </if>"
                 + "<if test='tagId != null'> "
                 + "AND EXISTS (SELECT 1 FROM artwork_tag_relation atr WHERE atr.artwork_id = a.id AND atr.tag_id = #{tagId} AND atr.is_deleted = 0) "
                 + "</if>"
                 + "ORDER BY a.create_time DESC"
                 + "</script>")
-        Page<ArtworkVO> selectFeedPage(Page<ArtworkVO> page, @Param("tagId") Long tagId);
+        Page<ArtworkVO> selectFeedPage(Page<ArtworkVO> page, @Param("tagId") Long tagId, @Param("categoryId") Long categoryId);
 
         /**
          * 根据ID查询作品详情（联表查询作者名和分类名，包含正文内容）
@@ -80,4 +81,10 @@ public interface ArtworkMapper extends BaseMapper<Artwork> {
                 + "LEFT JOIN category c ON a.category_id = c.id "
                 + "WHERE a.id = #{id} AND a.is_deleted = 0")
         ArtworkVO selectDetailById(@Param("id") Long id);
+
+        /**
+         * 统计指定用户已发布作品的总浏览量
+         */
+        @Select("SELECT COALESCE(SUM(view_count), 0) FROM artwork WHERE user_id = #{userId} AND status = 1 AND is_deleted = 0")
+        Integer selectTotalViewsByUserId(@Param("userId") Long userId);
 }

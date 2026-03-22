@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.creation.platform.entity.UserInteraction;
 import org.apache.ibatis.annotations.*;
 
+/**
+ * 用户互动（点赞/收藏） Mapper
+ */
 @Mapper
 public interface UserInteractionMapper extends BaseMapper<UserInteraction> {
 
@@ -25,4 +28,16 @@ public interface UserInteractionMapper extends BaseMapper<UserInteraction> {
      */
     @Select("SELECT is_deleted FROM user_interaction WHERE user_id = #{userId} AND artwork_id = #{artworkId} AND interaction_type = #{type}")
     Integer getInteractionStatus(@Param("userId") Long userId, @Param("artworkId") Long artworkId, @Param("type") Integer type);
+
+    /**
+     * 统计指定用户所有作品收到的点赞总数
+     * 连表 artwork 确保只统计已发布且未删除作品的点赞
+     */
+    @Select("SELECT COUNT(*) FROM user_interaction ui " +
+            "JOIN artwork a ON ui.artwork_id = a.id " +
+            "WHERE a.user_id = #{userId} " +
+            "AND ui.interaction_type = 1 " +
+            "AND ui.is_deleted = 0 " +
+            "AND a.is_deleted = 0")
+    Integer selectTotalLikesByUserId(@Param("userId") Long userId);
 }

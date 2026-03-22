@@ -11,6 +11,7 @@ package com.creation.platform.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.creation.platform.dto.UserUpdateDTO;
 import com.creation.platform.entity.User;
+import com.creation.platform.vo.UserStatsVO;
 
 public interface UserService extends IService<User> {
 
@@ -44,4 +45,11 @@ public interface UserService extends IService<User> {
      * @return 是否更新成功
      */
     boolean updateProfile(Long userId, UserUpdateDTO dto);
+
+    /**
+     * 获取当前登录用户的创作数据统计
+     * @param userId 用户ID
+     * @return 统计信息（文章数、浏览量、获赞数、粉丝数）
+     */
+    UserStatsVO getUserStats(Long userId);
 }

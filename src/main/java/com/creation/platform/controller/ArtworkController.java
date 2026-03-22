@@ -32,17 +32,19 @@ public class ArtworkController {
      * 公开作品流接口
      * 查询所有已发布(status=1)且未删除(is_deleted=0)的作品，按时间倒序分页返回
      *
-     * @param current 当前页码，默认第1页
-     * @param size    每页数量，默认10条
-     * @param tagId   标签ID（可选，为 null 时返回全部作品）
+     * @param current    当前页码，默认第1页
+     * @param size       每页数量，默认10条
+     * @param tagId      标签ID（可选，为 null 时返回全部作品）
+     * @param categoryId 分类ID（可选，为 null 时返回全部作品）
      * @return 分页后的作品列表（包含作者昵称和分类名称）
      */
     @GetMapping("/feed")
     public Result<Page<ArtworkVO>> getFeed(
             @RequestParam(defaultValue = "1") Integer current,
             @RequestParam(defaultValue = "10") Integer size,
-            @RequestParam(required = false) Long tagId) {
-        Page<ArtworkVO> page = artworkService.getFeedPage(current, size, tagId);
+            @RequestParam(required = false) Long tagId,
+            @RequestParam(required = false) Long categoryId) {
+        Page<ArtworkVO> page = artworkService.getFeedPage(current, size, tagId, categoryId);
         return Result.success(page);
     }
 

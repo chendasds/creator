@@ -5,6 +5,8 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.baomidou.mybatisplus.annotation.TableField;
+
 @Data
 public class ArtworkVO {
 
@@ -85,5 +87,6 @@ public class ArtworkVO {
     /**
      * 作品关联的标签列表（关联查询结果）
      */
+    @TableField(exist = false)
     private List<com.creation.platform.entity.Tag> tags;
 }

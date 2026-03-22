@@ -52,9 +52,9 @@ public class ArtworkServiceImpl extends ServiceImpl<ArtworkMapper, Artwork> impl
     }
 
     @Override
-    public Page<ArtworkVO> getFeedPage(Integer current, Integer size, Long tagId) {
+    public Page<ArtworkVO> getFeedPage(Integer current, Integer size, Long tagId, Long categoryId) {
         Page<ArtworkVO> page = new Page<>(current, size);
-        Page<ArtworkVO> pageResult = artworkMapper.selectFeedPage(page, tagId);
+        Page<ArtworkVO> pageResult = artworkMapper.selectFeedPage(page, tagId, categoryId);
 
         // 为信息流中的每篇文章组装标签数据
         if (pageResult.getRecords() != null) {
@@ -105,6 +105,13 @@ public class ArtworkServiceImpl extends ServiceImpl<ArtworkMapper, Artwork> impl
         collectCountWrapper.eq(UserInteraction::getArtworkId, id)
                 .eq(UserInteraction::getInteractionType, 2);
         artworkVO.setCollectCount(userInteractionMapper.selectCount(collectCountWrapper).intValue());
+
+        // 查询并注入标签列表
+        List<Long> tagIds = artworkTagRelationService.getTagIdsByArtworkId(id);
+        if (tagIds != null && !tagIds.isEmpty()) {
+            List<Tag> tags = tagService.listByIds(tagIds);
+            artworkVO.setTags(tags);
+        }
 
         return artworkVO;
     }

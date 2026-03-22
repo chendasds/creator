@@ -18,9 +18,10 @@ public interface ArtworkService extends IService<Artwork> {
      * 公开作品流分页查询
      * 查询 status=1 且 is_deleted=0 的作品，按时间倒序返回
      *
-     * @param tagId 标签ID（可选，为 null 时不过滤）
+     * @param tagId       标签ID（可选，为 null 时不过滤）
+     * @param categoryId  分类ID（可选，为 null 时不过滤）
      */
-    Page<ArtworkVO> getFeedPage(Integer current, Integer size, Long tagId);
+    Page<ArtworkVO> getFeedPage(Integer current, Integer size, Long tagId, Long categoryId);
 
     /**
      * 获取作品详情

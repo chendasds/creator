@@ -13,6 +13,7 @@ import com.creation.platform.entity.Result;
 import com.creation.platform.entity.User;
 import com.creation.platform.service.UserService;
 import com.creation.platform.utils.JwtUtils;
+import com.creation.platform.vo.UserStatsVO;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -116,5 +117,18 @@ public class UserController {
         } else {
             return Result.error(500, "更新失败");
         }
+    }
+
+    /**
+     * 获取当前登录用户的创作数据统计
+     * 需要登录，从 JWT 中获取当前用户ID
+     */
+    @GetMapping("/stats")
+    public Result<UserStatsVO> getUserStats(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error(401, "请先登录");
+        }
+        return Result.success(userService.getUserStats(userId));
     }
 }
