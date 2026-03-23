@@ -85,6 +85,16 @@ public class ArtworkVO {
     private Integer commentCount;
 
     /**
+     * 分类ID
+     */
+    private Long categoryId;
+
+    /**
+     * 作者ID（用于前端跳转个人主页）
+     */
+    private Long userId;
+
+    /**
      * 作品关联的标签列表（关联查询结果）
      */
     @TableField(exist = false)

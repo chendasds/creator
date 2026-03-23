@@ -18,7 +18,7 @@ public interface ArtworkMapper extends BaseMapper<Artwork> {
          * 后台管理作品列表联表分页查询
          */
         @Select("<script>" +
-                        "SELECT a.id, a.title, a.cover_url, a.description, a.view_count, a.word_count, a.status, a.create_time, "
+                        "SELECT a.id, a.user_id AS userId, a.category_id AS categoryId, a.title, a.cover_url, a.description, a.view_count, a.word_count, a.status, a.create_time, "
                         +
                         "u.nickname AS authorName, " +
                         "c.name AS categoryName " +
@@ -52,7 +52,7 @@ public interface ArtworkMapper extends BaseMapper<Artwork> {
          * 使用 EXISTS 子查询过滤标签，避免连表导致的分页总数错误
          */
         @Select("<script>" +
-                "SELECT a.id, a.title, a.cover_url, a.description, a.view_count, a.word_count, a.status, a.create_time, "
+                "SELECT a.id, a.user_id AS userId, a.category_id AS categoryId, a.title, a.cover_url, a.description, a.view_count, a.word_count, a.status, a.create_time, "
                 + "u.nickname AS authorName, "
                 + "c.name AS categoryName, "
                 + "(SELECT COUNT(*) FROM user_interaction ui WHERE ui.artwork_id = a.id AND ui.interaction_type = 1 AND ui.is_deleted = 0) AS likeCount, "
@@ -62,18 +62,20 @@ public interface ArtworkMapper extends BaseMapper<Artwork> {
                 + "LEFT JOIN user u ON a.user_id = u.id "
                 + "LEFT JOIN category c ON a.category_id = c.id "
                 + "WHERE a.status = 1 AND a.is_deleted = 0 "
+                + "<if test='followerId != null'> AND a.user_id IN (SELECT followee_id FROM user_follow WHERE follower_id = #{followerId} AND is_deleted = 0) </if>"
+                + "<if test='userId != null'> AND a.user_id = #{userId} </if>"
                 + "<if test='categoryId != null'> AND a.category_id = #{categoryId} </if>"
                 + "<if test='tagId != null'> "
                 + "AND EXISTS (SELECT 1 FROM artwork_tag_relation atr WHERE atr.artwork_id = a.id AND atr.tag_id = #{tagId} AND atr.is_deleted = 0) "
                 + "</if>"
                 + "ORDER BY a.create_time DESC"
                 + "</script>")
-        Page<ArtworkVO> selectFeedPage(Page<ArtworkVO> page, @Param("tagId") Long tagId, @Param("categoryId") Long categoryId);
+        Page<ArtworkVO> selectFeedPage(Page<ArtworkVO> page, @Param("tagId") Long tagId, @Param("categoryId") Long categoryId, @Param("userId") Long userId, @Param("followerId") Long followerId);
 
         /**
          * 根据ID查询作品详情（联表查询作者名和分类名，包含正文内容）
          */
-        @Select("SELECT a.id, a.title, a.cover_url, a.description, a.content, a.view_count, a.word_count, a.status, a.create_time, "
+        @Select("SELECT a.id, a.user_id AS userId, a.category_id AS categoryId, a.title, a.cover_url, a.description, a.content, a.view_count, a.word_count, a.status, a.create_time, "
                 + "u.nickname AS authorName, "
                 + "c.name AS categoryName "
                 + "FROM artwork a "

@@ -131,4 +131,13 @@ public class UserController {
         }
         return Result.success(userService.getUserStats(userId));
     }
+
+    /**
+     * 获取公开的用户数据面板（不需要登录）
+     * 用于展示他人主页的作品统计信息
+     */
+    @GetMapping("/public/stats/{id}")
+    public Result<UserStatsVO> getPublicUserStats(@PathVariable Long id) {
+        return Result.success(userService.getUserStats(id));
+    }
 }

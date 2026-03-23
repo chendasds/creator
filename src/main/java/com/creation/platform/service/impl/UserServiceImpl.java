@@ -24,6 +24,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Autowired
     private UserInteractionMapper userInteractionMapper;
 
+    @Autowired
+    private com.creation.platform.mapper.UserFollowMapper userFollowMapper;
+
     @Override
     public String register(String username, String password) {
         // 查询账号是否已存在
@@ -114,8 +117,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 3. 获赞数
         stats.setTotalLikes(userInteractionMapper.selectTotalLikesByUserId(userId));
 
-        // 4. 粉丝数（暂无关注表，默认返回0）
-        stats.setFanCount(0);
+        // 4. 粉丝数（查询 followee_id 为当前用户的正常记录数）
+        Long fanCount = userFollowMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.creation.platform.entity.UserFollow>()
+                        .eq(com.creation.platform.entity.UserFollow::getFolloweeId, userId));
+        stats.setFanCount(fanCount.intValue());
 
         return stats;
     }

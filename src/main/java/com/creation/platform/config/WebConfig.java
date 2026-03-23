@@ -31,26 +31,19 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(jwtInterceptor)
                 .addPathPatterns("/api/**")
                 .excludePathPatterns(
-                        // 公开接口 - 用户模块
+                        // 1. 登录与注册接口必须放行
                         "/api/user/login",
-                        "/api/user",
-                        // 公开接口 - 管理后台
+                        "/api/user/register",
                         "/api/admin/login",
-                        // 公开接口 - 首页
-                        "/api/artwork/list",
-                        "/api/category/list",
-                        "/api/tag/list",
-                        // 公开接口 - 文件上传
+                        // 2. 文件上传与访问静态资源放行
                         "/api/file/upload",
                         "/uploads/**",
-                        // Swagger 文档
+                        // 3. Swagger/Knife4j 接口文档放行
                         "/swagger-ui/**",
                         "/v3/api-docs/**",
                         "/swagger-resources/**",
                         "/webjars/**",
-                        // Knife4j 文档
-                        "/doc.html",
-                        "/webjars/**"
+                        "/doc.html"
                 );
     }
 

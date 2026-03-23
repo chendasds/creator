@@ -103,3 +103,85 @@
   - `UserServiceImpl.java` — 注入 `ArtworkMapper` 和 `UserInteractionMapper`，实现 `getUserStats`
   - `UserController.java` — 新增 `GET /stats` 接口，需登录拦截器校验
 - **遗留问题/下一步**：前端个人中心页接入 `/stats` 接口展示四项指标；后续接入关注系统后 `fanCount` 替换为真实粉丝数查询
+
+---
+
+- **日期**：2026-03-22
+- **完成功能**：新增关注系统核心代码（Entity / Mapper / Service / ServiceImpl 四层架构）
+- **核心技术点**：
+  - `UserFollow` 实体使用 `@TableLogic` 注解实现逻辑删除，`@TableField(fill = FieldFill.INSERT)` 自动填充创建时间，与其他实体保持一致
+  - `UserFollowMapper.toggleFollow` 复用 `INSERT ... ON DUPLICATE KEY UPDATE` 模式，与点赞/收藏逻辑完全一致，实现原子性的关注/取消关注切换
+  - `ServiceImpl` 继承 `ServiceImpl<UserFollowMapper, UserFollow>`，复用 MyBatis-Plus 的 CRUD 能力
+  - 数据库唯一索引应建在 `(follower_id, followee_id)` 上，`ON DUPLICATE KEY UPDATE` 依赖该唯一键工作
+- **新建的文件**：
+  - `entity/UserFollow.java` — 实体：`id / followerId / followeeId / createTime / isDeleted`
+  - `mapper/UserFollowMapper.java` — Mapper：继承 `BaseMapper`，新增 `toggleFollow` 方法
+  - `service/UserFollowService.java` — Service 接口：定义 `toggleFollow` 方法
+  - `service/impl/UserFollowServiceImpl.java` — Service 实现：`toggleFollow` 调用 Mapper
+- **遗留问题/下一步**：Controller 层暴露关注/取关接口（需要登录拦截器）；`fanCount` 已替换为真实查询
+
+---
+
+- **日期**：2026-03-22
+- **完成功能**：改造信息流接口支持 `userId` 过滤 + 新增公开用户数据面板接口（支持类似知乎的个人主页功能）
+- **核心技术点**：
+  - `ArtworkMapper.selectFeedPage` SQL 中追加 `<if test='userId != null'> AND a.user_id = #{userId} </if>`，位置优先于 categoryId，与标签过滤组合使用时保持逻辑清晰
+  - 信息流接口 `getFeedPage` 三层参数链式透传 `userId`（Mapper → Service → Controller），支持四条件自由组合：`tagId` / `categoryId` / `userId` + 分页
+  - 新增 `GET /api/user/public/stats/{id}` 公开接口，无需 Token，直接复用 `userService.getUserStats(id)` 查询指定用户的创作数据
+  - `WebConfig` 放行用户公开接口：`/api/user/public/**`、`/api/user/{id}`（他人主页查询），以及信息流 `/api/artwork/feed` 和作品详情 `/api/artwork/detail/**`，实现未登录用户可浏览公开内容
+- **修改的文件**：
+  - `ArtworkMapper.java` — `selectFeedPage` SQL 追加 userId 过滤条件，方法签名增加 `@Param("userId") Long userId`
+  - `ArtworkService.java` — `getFeedPage` 方法签名增加 `Long userId` 参数
+  - `ArtworkServiceImpl.java` — `getFeedPage` 实现透传 `userId` 给 Mapper
+  - `ArtworkController.java` — `getFeed` 接口增加 `@RequestParam(required = false) Long userId` 参数
+  - `UserController.java` — 新增 `GET /api/user/public/stats/{id}` 公开接口
+  - `WebConfig.java` — 放行 `/api/user/public/**`、`/api/user/{id}`、`/api/artwork/feed`、`/api/artwork/detail/**`
+- **遗留问题/下一步**：前端个人主页接入 `/api/user/public/stats/{id}` 和 `/api/artwork/feed?userId=xxx`；后续可新增关注/粉丝列表查询接口
+
+---
+
+- **日期**：2026-03-22
+- **完成功能**：`ArtworkVO` 新增 `userId` 字段，三个查询方法均补全该字段映射
+- **核心技术点**：
+  - `ArtworkVO` 新增 `userId` 字段（`@TableField(exist = false)` 不适用，VO 中有 getter/setter 即可被 MyBatis 自动映射，无需标注）
+  - 三处 SQL 均追加 `a.user_id AS userId`，确保字段别名与 VO 属性名一致，MyBatis 自动映射
+  - `selectFeedPage`（信息流）、`selectDetailById`（作品详情）、`selectArtworkPage`（后台管理）三个联表查询均补全，前端从任意列表入口均能拿到 `userId` 跳转个人主页
+- **修改的文件**：
+  - `ArtworkVO.java` — 新增 `private Long userId;` 字段
+  - `ArtworkMapper.java` — `selectArtworkPage` / `selectFeedPage` / `selectDetailById` 三处 SQL SELECT 列表均追加 `a.user_id AS userId`
+- **遗留问题/下一步**：前端确认 `userId` 能正确透传到个人主页跳转链接；`categoryId` 可用于前端展示当前分类标签及跳转筛选
+
+---
+
+- **日期**：2026-03-22
+- **完成功能**：`ArtworkVO` 新增 `categoryId` 字段，三个查询方法均补全该字段映射
+- **修改的文件**：
+  - `ArtworkVO.java` — 新增 `private Long categoryId;` 字段
+  - `ArtworkMapper.java` — `selectArtworkPage` / `selectFeedPage` / `selectDetailById` 三处 SQL SELECT 列表均追加 `a.category_id AS categoryId`
+
+---
+
+- **日期**：2026-03-23
+- **完成功能**：关注功能 Controller 层接口 + 关注流（仅看我关注的人）支持
+- **核心技术点**：
+  - `UserFollowMapper.checkFollowStatus` 通过 `@Select` 直接查询 `is_deleted` 字段，返回 `Integer`（null=从未关注，0=已关注，1=已取关），结合前端可展示关注/取关按钮状态
+  - `UserFollowController` 两个接口：`POST /api/follow/toggle`（切换关注）和 `GET /api/follow/check?followeeId=xxx`（查询关注状态）
+  - `ArtworkMapper.selectFeedPage` 新增 `followerId` 参数，SQL 追加 IN 子查询 `AND a.user_id IN (SELECT followee_id FROM user_follow WHERE follower_id = #{followerId} AND is_deleted = 0)`，仅返回当前用户已关注作者的已发布作品
+  - `ArtworkController.getFeed` 新增 `isFollowFeed` 参数（默认 `false`），为 `true` 时从 JWT 提取当前用户 ID 作为 `followerId`，未登录时返回 401；与其他参数（`tagId`、`categoryId`、`userId`）可叠加使用
+  - SQL 中 `followerId` 条件优先于 `userId`/`categoryId`/`tagId`，确保语义正确：关注流场景下不应出现他人作品
+- **修改的文件**：
+  - `UserFollowMapper.java` — 新增 `checkFollowStatus` 方法
+  - `UserFollowController.java` — 新增（关注/取关 + 状态查询两个接口）
+  - `ArtworkMapper.java` — `selectFeedPage` SQL 追加 `followerId` IN 子查询过滤，方法签名增加 `@Param("followerId") Long followerId`
+  - `ArtworkService.java` — `getFeedPage` 签名增加 `Long followerId` 参数
+  - `ArtworkServiceImpl.java` — `getFeedPage` 实现透传 `followerId` 给 Mapper
+  - `ArtworkController.java` — `getFeed` 新增 `HttpServletRequest request` 参数、`@RequestParam(defaultValue = "false") Boolean isFollowFeed` 参数，未登录关注流返回 401
+- **遗留问题/下一步**：前端"关注流"Tab 与全局信息流 Tab 切换；前端展示关注/取关按钮并调用 `/api/follow/toggle` 和 `/api/follow/check`
+
+---
+
+- **日期**：2026-03-23
+- **完成功能**：全站强制登录，拦截器白名单收紧
+- **修改的文件**：
+  - `WebConfig.java` — `excludePathPatterns` 删除了所有业务公开接口（`/api/artwork/feed`、`/api/user/public/**` 等），仅保留登录/注册、静态资源、Swagger 文档四类路径
+- **影响范围**：所有业务接口（信息流、分类、标签、作品详情、用户数据面板、关注/取关等）均强制要求携带有效 JWT Token，未登录请求统一返回 401

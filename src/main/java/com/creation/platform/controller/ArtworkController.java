@@ -32,19 +32,31 @@ public class ArtworkController {
      * 公开作品流接口
      * 查询所有已发布(status=1)且未删除(is_deleted=0)的作品，按时间倒序分页返回
      *
-     * @param current    当前页码，默认第1页
-     * @param size       每页数量，默认10条
-     * @param tagId      标签ID（可选，为 null 时返回全部作品）
-     * @param categoryId 分类ID（可选，为 null 时返回全部作品）
+     * @param current     当前页码，默认第1页
+     * @param size        每页数量，默认10条
+     * @param tagId       标签ID（可选，为 null 时返回全部作品）
+     * @param categoryId  分类ID（可选，为 null 时返回全部作品）
+     * @param userId      用户ID（可选，为 null 时返回全局作品流，为非空时返回该用户的作品列表）
+     * @param isFollowFeed 关注流标识（可选，true 时仅返回当前登录用户关注的人发布的作品）
      * @return 分页后的作品列表（包含作者昵称和分类名称）
      */
     @GetMapping("/feed")
     public Result<Page<ArtworkVO>> getFeed(
+            HttpServletRequest request,
             @RequestParam(defaultValue = "1") Integer current,
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) Long tagId,
-            @RequestParam(required = false) Long categoryId) {
-        Page<ArtworkVO> page = artworkService.getFeedPage(current, size, tagId, categoryId);
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(defaultValue = "false") Boolean isFollowFeed) {
+        Long followerId = null;
+        if (isFollowFeed) {
+            followerId = (Long) request.getAttribute("userId");
+            if (followerId == null) {
+                return Result.error(401, "请先登录查看关注动态");
+            }
+        }
+        Page<ArtworkVO> page = artworkService.getFeedPage(current, size, tagId, categoryId, userId, followerId);
         return Result.success(page);
     }
 
