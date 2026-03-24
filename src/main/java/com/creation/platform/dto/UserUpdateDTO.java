@@ -22,4 +22,14 @@ public class UserUpdateDTO {
      * 头像URL
      */
     private String avatarUrl;
+
+    /**
+     * 个人简介
+     */
+    private String bio;
+
+    /**
+     * 性别: 0-保密 1-男 2-女
+     */
+    private Integer gender;
 }

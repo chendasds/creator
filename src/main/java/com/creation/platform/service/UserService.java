@@ -9,6 +9,8 @@
 package com.creation.platform.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.creation.platform.dto.PasswordUpdateDTO;
+import com.creation.platform.dto.UserSettingsDTO;
 import com.creation.platform.dto.UserUpdateDTO;
 import com.creation.platform.entity.User;
 import com.creation.platform.vo.UserStatsVO;
@@ -45,6 +47,22 @@ public interface UserService extends IService<User> {
      * @return 是否更新成功
      */
     boolean updateProfile(Long userId, UserUpdateDTO dto);
+
+    /**
+     * 修改密码
+     * @param userId 用户ID
+     * @param dto 包含旧密码和新密码
+     * @return 是否修改成功
+     */
+    boolean updatePassword(Long userId, PasswordUpdateDTO dto);
+
+    /**
+     * 更新账号隐私与偏好设置
+     * @param userId 用户ID
+     * @param dto 账号设置信息
+     * @return 是否更新成功
+     */
+    boolean updateSettings(Long userId, UserSettingsDTO dto);
 
     /**
      * 获取当前登录用户的创作数据统计

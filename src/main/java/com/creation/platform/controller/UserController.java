@@ -8,9 +8,12 @@
  */
 package com.creation.platform.controller;
 
+import com.creation.platform.dto.PasswordUpdateDTO;
+import com.creation.platform.dto.UserSettingsDTO;
 import com.creation.platform.dto.UserUpdateDTO;
 import com.creation.platform.entity.Result;
 import com.creation.platform.entity.User;
+import com.creation.platform.mapper.UserMapper;
 import com.creation.platform.service.UserService;
 import com.creation.platform.utils.JwtUtils;
 import com.creation.platform.vo.UserStatsVO;
@@ -28,6 +31,9 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private UserMapper userMapper;
 
     @GetMapping("/{id}")
     public User getById(@PathVariable Long id) {
@@ -120,6 +126,31 @@ public class UserController {
     }
 
     /**
+     * 修改当前登录用户密码
+     */
+    @PutMapping("/password")
+    public Result<Void> updatePassword(HttpServletRequest request, @RequestBody PasswordUpdateDTO dto) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error(401, "请先登录");
+        }
+
+        // 依靠 GlobalExceptionHandler 处理业务异常（如原密码错误）
+        userService.updatePassword(userId, dto);
+        return Result.success("密码修改成功，请重新登录", null);
+    }
+
+    /**
+     * 更新账号隐私与偏好设置
+     */
+    @PutMapping("/settings")
+    public Result<Void> updateSettings(HttpServletRequest request, @RequestBody UserSettingsDTO dto) {
+        Long userId = (Long) request.getAttribute("userId");
+        boolean success = userService.updateSettings(userId, dto);
+        return success ? Result.success("设置更新成功", null) : Result.error(500, "设置更新失败");
+    }
+
+    /**
      * 获取当前登录用户的创作数据统计
      * 需要登录，从 JWT 中获取当前用户ID
      */
@@ -139,5 +170,16 @@ public class UserController {
     @GetMapping("/public/stats/{id}")
     public Result<UserStatsVO> getPublicUserStats(@PathVariable Long id) {
         return Result.success(userService.getUserStats(id));
+    }
+
+    /**
+     * 根据关键字搜索用户（模糊匹配昵称和用户名，最多返回5条）
+     */
+    @GetMapping("/public/search")
+    public Result<List<User>> searchUsers(@RequestParam String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return Result.success(java.util.Collections.emptyList());
+        }
+        return Result.success(userMapper.searchUsers(keyword.trim()));
     }
 }

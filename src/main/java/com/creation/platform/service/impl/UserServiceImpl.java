@@ -2,6 +2,8 @@ package com.creation.platform.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.creation.platform.dto.PasswordUpdateDTO;
+import com.creation.platform.dto.UserSettingsDTO;
 import com.creation.platform.dto.UserUpdateDTO;
 import com.creation.platform.entity.Artwork;
 import com.creation.platform.entity.User;
@@ -11,12 +13,14 @@ import com.creation.platform.mapper.UserMapper;
 import com.creation.platform.service.UserService;
 import com.creation.platform.vo.UserStatsVO;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.util.DigestUtils;
 
 @SuppressWarnings("all")
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+
+    private static final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Autowired
     private ArtworkMapper artworkMapper;
@@ -38,7 +42,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
 
         // 加密密码
-        String encryptedPassword = DigestUtils.md5DigestAsHex((password + "").getBytes());
+        String encryptedPassword = passwordEncoder.encode(password);
 
         // 创建新用户
         User newUser = new User();
@@ -62,9 +66,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             return null;
         }
 
-        // 加密前端传来的密码，与数据库比对
-        String encryptedPassword = DigestUtils.md5DigestAsHex((password + "").getBytes());
-        if (!encryptedPassword.equals(user.getPassword())) {
+        // 校验密码
+        if (!passwordEncoder.matches(password, user.getPassword())) {
             return null;
         }
 
@@ -97,6 +100,40 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (dto.getAvatarUrl() != null) {
             user.setAvatarUrl(dto.getAvatarUrl());
         }
+        if (dto.getBio() != null) {
+            user.setBio(dto.getBio());
+        }
+        if (dto.getGender() != null) {
+            user.setGender(dto.getGender());
+        }
+        return this.updateById(user);
+    }
+
+    @Override
+    public boolean updateSettings(Long userId, UserSettingsDTO dto) {
+        User user = new User();
+        user.setId(userId);
+        user.setPhone(dto.getPhone());
+        user.setHideCollections(dto.getHideCollections());
+        user.setDisableNotifications(dto.getDisableNotifications());
+        user.setWatermark(dto.getWatermark());
+        return this.updateById(user);
+    }
+
+    @Override
+    public boolean updatePassword(Long userId, PasswordUpdateDTO dto) {
+        User user = this.getById(userId);
+        if (user == null) {
+            return false;
+        }
+
+        // 1. 使用 BCrypt 校验旧密码是否正确
+        if (!passwordEncoder.matches(dto.getOldPassword(), user.getPassword())) {
+            throw new RuntimeException("原密码错误");
+        }
+
+        // 2. 使用 BCrypt 加密并保存新密码
+        user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
         return this.updateById(user);
     }
 

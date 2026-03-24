@@ -176,7 +176,18 @@
   - `ArtworkService.java` — `getFeedPage` 签名增加 `Long followerId` 参数
   - `ArtworkServiceImpl.java` — `getFeedPage` 实现透传 `followerId` 给 Mapper
   - `ArtworkController.java` — `getFeed` 新增 `HttpServletRequest request` 参数、`@RequestParam(defaultValue = "false") Boolean isFollowFeed` 参数，未登录关注流返回 401
-- **遗留问题/下一步**：前端"关注流"Tab 与全局信息流 Tab 切换；前端展示关注/取关按钮并调用 `/api/follow/toggle` 和 `/api/follow/check`；前端实现排序 Tab（推荐/最新）切换并传入对应 `sortType`；前端热门分类 Tab 调用 `/api/category/public/hot`；前端搜索框调用 `/api/artwork/feed?keyword=xxx`
+- **遗留问题/下一步**：前端"关注流"Tab 与全局信息流 Tab 切换；前端展示关注/取关按钮并调用 `/api/follow/toggle` 和 `/api/follow/check`；前端实现排序 Tab（推荐/最新）切换并传入对应 `sortType`；前端热门分类 Tab 调用 `/api/category/public/hot`；前端搜索框调用 `/api/artwork/feed?keyword=xxx`；前端用户搜索下拉调用 `/api/user/public/search?keyword=xxx`
+
+---
+
+
+
+- **日期**：2026-03-23
+- **完成功能**：新增用户关键字搜索接口
+- **修改的文件**：
+  - `UserMapper.java` — 新增 `searchUsers(String keyword)` 方法（模糊匹配 `nickname`/`username`，LIMIT 5），新增 `import org.apache.ibatis.annotations.Param`、`import org.apache.ibatis.annotations.Select`、`import java.util.List`
+  - `UserController.java` — 新增 `GET /api/user/public/search` 公开接口，空关键字直接返回空列表，新增 `import com.creation.platform.mapper.UserMapper`、`import jakarta.annotation.Autowired private UserMapper userMapper`
+- **前端使用**：`GET /api/user/public/search?keyword=关键字`，最多返回 5 条匹配用户（昵称或用户名含关键字即命中）
 
 ---
 
@@ -224,3 +235,52 @@
 
 ---
 
+- **日期**：2026-03-23
+- **完成功能**：将密码加密从 MD5 全面替换为 BCryptPasswordEncoder
+- **核心技术点**：
+  - 引入 `spring-security-crypto` 轻量级依赖（仅加密模块，不引入整个 starter）
+  - `BCryptPasswordEncoder` 使用 BCrypt 强哈希算法，自带盐值，支持自适应计算强度（默认 cost=10），相较 MD5 不可逆且防彩虹表攻击
+  - 注册时：`passwordEncoder.encode(password)` 加密新密码并存储
+  - 登录时：`passwordEncoder.matches(rawPassword, encodedPassword)` 进行安全比对，底层自动提取盐值重新计算哈希后对比，无需手动处理盐
+  - `passwordEncoder` 以 `private static final` 单例模式持有，避免重复创建开销
+- **修改的文件**：
+  - `pom.xml` — 新增 `spring-security-crypto` 依赖
+  - `UserServiceImpl.java` — 移除 `DigestUtils` import，新增 `BCryptPasswordEncoder` import 及静态实例，改造 `register` 和 `login` 方法中的密码处理逻辑
+- **遗留问题/下一步**：现有用户的 MD5 密码无法直接用于 BCrypt 登录，需设计密码迁移策略（如首次登录时自动用 BCrypt 重写密码）；旧数据库中的 MD5 密码需要逐步引导用户修改密码后完成迁移
+
+---
+
+- **日期**：2026-03-24
+- **完成功能**：新增修改密码接口 `PUT /api/user/password`（需登录）
+- **核心技术点**：
+  - 新建 `PasswordUpdateDTO` 作为请求体载体，包含 `oldPassword`（旧密码明文）和 `newPassword`（新密码明文）两个字段
+  - Service 层复用已有的 `BCryptPasswordEncoder` 实例：`passwordEncoder.matches(raw, encoded)` 校验旧密码，`passwordEncoder.encode(raw)` 加密新密码，全程不暴露明文
+  - 旧密码校验失败直接 `throw new RuntimeException("原密码错误")`，由全局异常处理器统一处理并返回客户端
+  - 接口无返回值数据（`Result<Void>`），成功时直接返回提示语"密码修改成功，请重新登录"
+- **新建的文件**：
+  - `dto/PasswordUpdateDTO.java` — 新建，`oldPassword` / `newPassword` 两个字段，使用 `@Data` Lombok 注解
+- **修改的文件**：
+  - `UserService.java` — 新增 `boolean updatePassword(Long userId, PasswordUpdateDTO dto)` 接口声明
+  - `UserServiceImpl.java` — 实现 `updatePassword`：查询用户 → BCrypt 校验旧密码 → BCrypt 加密新密码 → `updateById` 保存
+  - `UserController.java` — 新增 `PUT /api/user/password` 接口，需登录，从 `HttpServletRequest` 提取 `userId` 注入 Service
+- **遗留问题/下一步**：前端设置页接入该接口；可考虑新增密码强度校验（长度、字符类型等）；建议旧 MD5 密码用户首次登录时强制引导修改密码
+
+---
+
+- **日期**：2026-03-24
+- **完成功能**：User 实体新增 6 个扩展字段，配套 DTO 拆分及 Settings 接口
+- **核心技术点**：
+  - `User.java` 新增 6 个字段（`phone`、`bio`、`gender`、`hideCollections`、`disableNotifications`、`watermark`），所有字段均为"可空/有默认值"的灵活设计，不影响已有数据
+  - `UserUpdateDTO` 扩展支持 `bio`、`gender`，专用于"个人资料"更新（昵称、头像、简介、性别）
+  - 新建 `UserSettingsDTO`，包含 `phone`、`hideCollections`、`disableNotifications`、`watermark`，专用于"账号设置"更新（手机号、隐私偏好、通知偏好、水印偏好）
+  - 两个 DTO 职责分离，Controller 层独立暴露 `PUT /profile`（资料）和 `PUT /settings`（设置）两条路径，职责边界清晰
+  - `updateProfile` 在原有的 `nickname`/`email`/`avatarUrl` 基础上追加了 `bio` 和 `gender` 的判空赋值
+  - `updateSettings` 使用"构造 User 实体 + 只 set 需要修改的字段"策略，避免查询开销；`MyMetaObjectHandler` 的自动填充机制会忽略 null 字段，保证其他字段不被意外覆盖
+- **新建的文件**：
+  - `dto/UserSettingsDTO.java` — 新建，包含 `phone`/`hideCollections`/`disableNotifications`/`watermark` 四个隐私偏好字段
+- **修改的文件**：
+  - `entity/User.java` — 在 `email` 字段后追加 6 个新字段（含注释）
+  - `dto/UserUpdateDTO.java` — 新增 `bio`、`gender` 两个字段
+  - `UserService.java` — 新增 `boolean updateSettings(Long userId, UserSettingsDTO dto)` 接口声明
+  - `UserServiceImpl.java` — `updateProfile` 追加 `bio`/`gender` 赋值；新增 `updateSettings` 实现（构造 User → set 四个字段 → updateById）
+  - `UserController.java` — 新增 `PUT /api/user/settings` 接口，需登录，成功返回"设置更新成功"
