@@ -22,8 +22,10 @@ public interface ArtworkService extends IService<Artwork> {
      * @param categoryId  分类ID（可选，为 null 时不过滤）
      * @param userId      用户ID（可选，用于查询指定用户的作品列表）
      * @param followerId  关注者ID（可选，为非空时仅返回该用户关注的人发布的作品）
+     * @param sortType   排序方式（可选，默认 recommend；recommend=热度推荐，time=最新发布）
+     * @param keyword    关键字（可选，同时模糊匹配标题和简介）
      */
-    Page<ArtworkVO> getFeedPage(Integer current, Integer size, Long tagId, Long categoryId, Long userId, Long followerId);
+    Page<ArtworkVO> getFeedPage(Integer current, Integer size, Long tagId, Long categoryId, Long userId, Long followerId, String sortType, String keyword);
 
     /**
      * 获取作品详情

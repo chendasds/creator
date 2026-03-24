@@ -52,9 +52,9 @@ public class ArtworkServiceImpl extends ServiceImpl<ArtworkMapper, Artwork> impl
     }
 
     @Override
-    public Page<ArtworkVO> getFeedPage(Integer current, Integer size, Long tagId, Long categoryId, Long userId, Long followerId) {
+    public Page<ArtworkVO> getFeedPage(Integer current, Integer size, Long tagId, Long categoryId, Long userId, Long followerId, String sortType, String keyword) {
         Page<ArtworkVO> page = new Page<>(current, size);
-        Page<ArtworkVO> pageResult = artworkMapper.selectFeedPage(page, tagId, categoryId, userId, followerId);
+        Page<ArtworkVO> pageResult = artworkMapper.selectFeedPage(page, tagId, categoryId, userId, followerId, sortType, keyword);
 
         // 为信息流中的每篇文章组装标签数据
         if (pageResult.getRecords() != null) {

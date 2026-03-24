@@ -176,7 +176,29 @@
   - `ArtworkService.java` — `getFeedPage` 签名增加 `Long followerId` 参数
   - `ArtworkServiceImpl.java` — `getFeedPage` 实现透传 `followerId` 给 Mapper
   - `ArtworkController.java` — `getFeed` 新增 `HttpServletRequest request` 参数、`@RequestParam(defaultValue = "false") Boolean isFollowFeed` 参数，未登录关注流返回 401
-- **遗留问题/下一步**：前端"关注流"Tab 与全局信息流 Tab 切换；前端展示关注/取关按钮并调用 `/api/follow/toggle` 和 `/api/follow/check`
+- **遗留问题/下一步**：前端"关注流"Tab 与全局信息流 Tab 切换；前端展示关注/取关按钮并调用 `/api/follow/toggle` 和 `/api/follow/check`；前端实现排序 Tab（推荐/最新）切换并传入对应 `sortType`；前端热门分类 Tab 调用 `/api/category/public/hot`；前端搜索框调用 `/api/artwork/feed?keyword=xxx`
+
+---
+
+- **日期**：2026-03-23
+- **完成功能**：信息流接口新增关键字搜索（模糊匹配标题 + 简介）
+- **修改的文件**：
+  - `ArtworkMapper.java` — `selectFeedPage` SQL 在 `WHERE` 后追加 `<if test='keyword != null and keyword != ""'> AND (a.title LIKE CONCAT('%', #{keyword}, '%') OR a.description LIKE CONCAT('%', #{keyword}, '%')) </if>`，方法签名新增 `@Param("keyword") String keyword`
+  - `ArtworkService.java` — `getFeedPage` 签名增加 `String keyword`
+  - `ArtworkServiceImpl.java` — `getFeedPage` 签名 + 实现均透传 `keyword` 给 Mapper
+  - `ArtworkController.java` — `getFeed` 新增 `@RequestParam(required = false) String keyword`，文档注释更新
+- **前端使用**：`GET /api/artwork/feed?keyword=关键字`，可与 `sortType`、`categoryId`、`isFollowFeed` 等参数叠加组合过滤
+
+---
+
+- **日期**：2026-03-23
+- **完成功能**：新增热门分类接口（按已发布文章数倒序，取前8个）
+- **修改的文件**：
+  - `CategoryMapper.java` — 新增 `selectHotCategories()` 方法（LEFT JOIN + GROUP BY + COUNT + LIMIT 8），新增 `import java.util.List`
+  - `CategoryService.java` — 新增 `List<Category> getHotCategories()` 接口
+  - `CategoryServiceImpl.java` — 实现 `getHotCategories()`，直接委托 `baseMapper.selectHotCategories()`
+  - `CategoryController.java` — 新增 `GET /api/category/public/hot` 公开接口
+- **前端使用**：`GET /api/category/public/hot`，返回最多 8 个热门分类（已发布文章数最多的分类排在前面）
 
 ---
 
@@ -185,3 +207,20 @@
 - **修改的文件**：
   - `WebConfig.java` — `excludePathPatterns` 删除了所有业务公开接口（`/api/artwork/feed`、`/api/user/public/**` 等），仅保留登录/注册、静态资源、Swagger 文档四类路径
 - **影响范围**：所有业务接口（信息流、分类、标签、作品详情、用户数据面板、关注/取关等）均强制要求携带有效 JWT Token，未登录请求统一返回 401
+
+
+- **日期**：2026-03-23
+- **完成功能**：信息流支持热度推荐排序
+- **核心算法**：`热度分 = view_count * 1 + likeCount * 5 + commentCount * 10`，热度分相同时按时间倒序保序
+- **修改的文件**：
+  - `ArtworkMapper.java` — `selectFeedPage` 新增 `sortType` 参数，SQL 末尾改为 `<choose>` 动态 ORDER BY（`recommend` 执行热度公式，`time` 或其他走时间倒序）
+  - `ArtworkService.java` — `getFeedPage` 签名增加 `String sortType`
+  - `ArtworkServiceImpl.java` — `getFeedPage` 实现透传 `sortType` 给 Mapper
+  - `ArtworkController.java` — `getFeed` 新增 `@RequestParam(defaultValue = "recommend") String sortType`，文档注释更新
+- **前端使用方式**：
+  - `GET /api/artwork/feed?sortType=recommend`（默认，热度推荐）
+  - `GET /api/artwork/feed?sortType=time`（最新发布）
+  - 两者均可与 `isFollowFeed`、`categoryId`、`tagId` 等参数叠加
+
+---
+

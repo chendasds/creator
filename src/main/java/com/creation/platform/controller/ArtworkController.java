@@ -38,6 +38,8 @@ public class ArtworkController {
      * @param categoryId  分类ID（可选，为 null 时返回全部作品）
      * @param userId      用户ID（可选，为 null 时返回全局作品流，为非空时返回该用户的作品列表）
      * @param isFollowFeed 关注流标识（可选，true 时仅返回当前登录用户关注的人发布的作品）
+     * @param sortType     排序方式（可选，默认 recommend；recommend=热度推荐，time=最新发布）
+     * @param keyword      关键字（可选，同时模糊匹配标题和简介）
      * @return 分页后的作品列表（包含作者昵称和分类名称）
      */
     @GetMapping("/feed")
@@ -48,7 +50,9 @@ public class ArtworkController {
             @RequestParam(required = false) Long tagId,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long userId,
-            @RequestParam(defaultValue = "false") Boolean isFollowFeed) {
+            @RequestParam(defaultValue = "false") Boolean isFollowFeed,
+            @RequestParam(defaultValue = "recommend") String sortType,
+            @RequestParam(required = false) String keyword) {
         Long followerId = null;
         if (isFollowFeed) {
             followerId = (Long) request.getAttribute("userId");
@@ -56,7 +60,7 @@ public class ArtworkController {
                 return Result.error(401, "请先登录查看关注动态");
             }
         }
-        Page<ArtworkVO> page = artworkService.getFeedPage(current, size, tagId, categoryId, userId, followerId);
+        Page<ArtworkVO> page = artworkService.getFeedPage(current, size, tagId, categoryId, userId, followerId, sortType, keyword);
         return Result.success(page);
     }
 

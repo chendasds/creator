@@ -68,9 +68,19 @@ public interface ArtworkMapper extends BaseMapper<Artwork> {
                 + "<if test='tagId != null'> "
                 + "AND EXISTS (SELECT 1 FROM artwork_tag_relation atr WHERE atr.artwork_id = a.id AND atr.tag_id = #{tagId} AND atr.is_deleted = 0) "
                 + "</if>"
+                + "<if test='keyword != null and keyword != \"\"'>"
+                + " AND (a.title LIKE CONCAT('%', #{keyword}, '%') OR a.description LIKE CONCAT('%', #{keyword}, '%'))"
+                + "</if>"
+                + "<choose>"
+                + "<when test='sortType == \"recommend\"'>"
+                + "ORDER BY (a.view_count * 1 + IFNULL(likeCount, 0) * 5 + IFNULL(commentCount, 0) * 10) DESC, a.create_time DESC"
+                + "</when>"
+                + "<otherwise>"
                 + "ORDER BY a.create_time DESC"
+                + "</otherwise>"
+                + "</choose>"
                 + "</script>")
-        Page<ArtworkVO> selectFeedPage(Page<ArtworkVO> page, @Param("tagId") Long tagId, @Param("categoryId") Long categoryId, @Param("userId") Long userId, @Param("followerId") Long followerId);
+        Page<ArtworkVO> selectFeedPage(Page<ArtworkVO> page, @Param("tagId") Long tagId, @Param("categoryId") Long categoryId, @Param("userId") Long userId, @Param("followerId") Long followerId, @Param("sortType") String sortType, @Param("keyword") String keyword);
 
         /**
          * 根据ID查询作品详情（联表查询作者名和分类名，包含正文内容）

@@ -6,6 +6,8 @@ import com.creation.platform.mapper.CategoryMapper;
 import com.creation.platform.service.CategoryService;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> implements CategoryService {
 
@@ -30,5 +32,10 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
 
         // 4. 数据库中完全没有同名数据 -> 执行正常的新增
         return this.save(category);
+    }
+
+    @Override
+    public List<Category> getHotCategories() {
+        return baseMapper.selectHotCategories();
     }
 }

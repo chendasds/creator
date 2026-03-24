@@ -3,6 +3,8 @@ package com.creation.platform.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.creation.platform.entity.Category;
 
+import java.util.List;
+
 public interface CategoryService extends IService<Category> {
 
     /**
@@ -11,4 +13,9 @@ public interface CategoryService extends IService<Category> {
      * @return 保存结果
      */
     boolean saveWithRecovery(Category category);
+
+    /**
+     * 获取热门分类（按关联的已发布文章数倒序，取前8个）
+     */
+    List<Category> getHotCategories();
 }

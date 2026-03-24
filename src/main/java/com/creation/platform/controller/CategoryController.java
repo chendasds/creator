@@ -27,6 +27,14 @@ public class CategoryController {
         return Result.success(categoryService.list(new LambdaQueryWrapper<Category>().orderByAsc(Category::getSortOrder)));
     }
 
+    /**
+     * 获取热门分类（按关联的已发布文章数倒序，取前8个）
+     */
+    @GetMapping("/public/hot")
+    public Result<List<Category>> getHotCategories() {
+        return Result.success(categoryService.getHotCategories());
+    }
+
     @GetMapping("/page")
     public Result<Page<Category>> page(
             @RequestParam(defaultValue = "1") Integer current,
