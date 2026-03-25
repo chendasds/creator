@@ -3,9 +3,12 @@ package com.creation.platform.controller;
 import com.creation.platform.dto.InteractionDTO;
 import com.creation.platform.entity.Result;
 import com.creation.platform.service.UserInteractionService;
+import com.creation.platform.vo.ArtworkVO;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/interaction")
@@ -45,5 +48,28 @@ public class UserInteractionController {
         Long userId = (Long) request.getAttribute("userId");
         boolean existed = userInteractionService.hasInteracted(userId, artworkId, interactionType);
         return Result.success(existed);
+    }
+
+    /**
+     * 获取指定用户的收藏列表（需登录，支持标签筛选）
+     * 非本人访问时，如果对方开启了"隐藏收藏"，返回 403
+     */
+    @GetMapping("/collections/{userId}")
+    public Result<List<ArtworkVO>> getCollections(
+            @PathVariable Long userId,
+            @RequestParam(required = false) Long tagId,
+            HttpServletRequest request) {
+        Long currentUserId = (Long) request.getAttribute("userId");
+        return userInteractionService.getCollections(userId, currentUserId, tagId);
+    }
+
+    /**
+     * 获取指定用户的点赞列表（默认公开，支持标签筛选）
+     */
+    @GetMapping("/likes/{userId}")
+    public Result<List<ArtworkVO>> getLikes(
+            @PathVariable Long userId,
+            @RequestParam(required = false) Long tagId) {
+        return userInteractionService.getLikes(userId, tagId);
     }
 }

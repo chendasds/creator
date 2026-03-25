@@ -99,4 +99,40 @@ public interface ArtworkMapper extends BaseMapper<Artwork> {
          */
         @Select("SELECT COALESCE(SUM(view_count), 0) FROM artwork WHERE user_id = #{userId} AND status = 1 AND is_deleted = 0")
         Integer selectTotalViewsByUserId(@Param("userId") Long userId);
+
+        /**
+         * 查询指定用户收藏的作品列表（支持标签筛选，含点赞数和评论数）
+         */
+        @Select("<script>" +
+                "SELECT a.id, a.user_id AS userId, a.category_id AS categoryId, a.title, a.cover_url, a.description, a.view_count, a.word_count, a.status, a.create_time, " +
+                "u.nickname AS authorName, c.name AS categoryName, " +
+                "(SELECT COUNT(*) FROM user_interaction ui2 WHERE ui2.artwork_id = a.id AND ui2.interaction_type = 1 AND ui2.is_deleted = 0) AS likeCount, " +
+                "(SELECT COUNT(*) FROM comment co WHERE co.artwork_id = a.id AND co.is_deleted = 0) AS commentCount " +
+                "FROM artwork a " +
+                "INNER JOIN user_interaction ui ON a.id = ui.artwork_id " +
+                "LEFT JOIN user u ON a.user_id = u.id " +
+                "LEFT JOIN category c ON a.category_id = c.id " +
+                "WHERE ui.user_id = #{userId} AND ui.interaction_type = 2 AND a.is_deleted = 0 AND ui.is_deleted = 0 " +
+                "<if test='tagId != null'> AND EXISTS (SELECT 1 FROM artwork_tag_relation atr WHERE atr.artwork_id = a.id AND atr.tag_id = #{tagId} AND atr.is_deleted = 0) </if> " +
+                "ORDER BY ui.create_time DESC" +
+                "</script>")
+        List<com.creation.platform.vo.ArtworkVO> selectCollectedArtworks(@Param("userId") Long userId, @Param("tagId") Long tagId);
+
+        /**
+         * 查询指定用户点赞的作品列表（支持标签筛选，含点赞数和评论数）
+         */
+        @Select("<script>" +
+                "SELECT a.id, a.user_id AS userId, a.category_id AS categoryId, a.title, a.cover_url, a.description, a.view_count, a.word_count, a.status, a.create_time, " +
+                "u.nickname AS authorName, c.name AS categoryName, " +
+                "(SELECT COUNT(*) FROM user_interaction ui2 WHERE ui2.artwork_id = a.id AND ui2.interaction_type = 1 AND ui2.is_deleted = 0) AS likeCount, " +
+                "(SELECT COUNT(*) FROM comment co WHERE co.artwork_id = a.id AND co.is_deleted = 0) AS commentCount " +
+                "FROM artwork a " +
+                "INNER JOIN user_interaction ui ON a.id = ui.artwork_id " +
+                "LEFT JOIN user u ON a.user_id = u.id " +
+                "LEFT JOIN category c ON a.category_id = c.id " +
+                "WHERE ui.user_id = #{userId} AND ui.interaction_type = 1 AND a.is_deleted = 0 AND ui.is_deleted = 0 " +
+                "<if test='tagId != null'> AND EXISTS (SELECT 1 FROM artwork_tag_relation atr WHERE atr.artwork_id = a.id AND atr.tag_id = #{tagId} AND atr.is_deleted = 0) </if> " +
+                "ORDER BY ui.create_time DESC" +
+                "</script>")
+        List<com.creation.platform.vo.ArtworkVO> selectLikedArtworks(@Param("userId") Long userId, @Param("tagId") Long tagId);
 }

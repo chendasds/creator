@@ -2,6 +2,35 @@
 
 ---
 
+- **日期**：2026-03-24
+- **完成功能**：点赞/收藏列表 SQL 补全点赞数（likeCount）和评论数（commentCount）
+- **核心技术点**：
+  - `selectCollectedArtworks` / `selectLikedArtworks` 的 SELECT 字段追加两条标量子查询：`likeCount`（点赞数）和 `commentCount`（评论数），与信息流 `selectFeedPage` 保持完全一致的字段口径
+  - `likeCount` 子查询使用别名 `ui2` 避免与外层 JOIN 的 `ui` 表别名冲突：`SELECT COUNT(*) FROM user_interaction ui2 WHERE ui2.artwork_id = a.id AND ui2.interaction_type = 1 AND ui2.is_deleted = 0`
+  - `commentCount` 子查询：`SELECT COUNT(*) FROM comment co WHERE co.artwork_id = a.id AND co.is_deleted = 0`，逻辑删除过滤
+  - `ArtworkVO.likeCount` / `commentCount` 字段已在之前的信息流功能中存在（`selectFeedPage` 中使用过），无需新建字段
+- **修改的文件**：
+  - `ArtworkMapper.java` — `selectCollectedArtworks` / `selectLikedArtworks` 两条 SQL SELECT 字段列表追加 `likeCount` 和 `commentCount` 两个子查询
+
+---
+
+- **日期**：2026-03-24
+- **完成功能**：个人主页点赞/收藏列表支持右侧『热门标签』点击筛选 + 修复逻辑删除遗漏
+- **核心技术点**：
+  - `ArtworkMapper.selectCollectedArtworks` / `selectLikedArtworks` 改造为 `<script>` 动态 SQL，增加 `tagId` 可选参数
+  - 标签筛选使用 `EXISTS` 子查询：`AND EXISTS (SELECT 1 FROM artwork_tag_relation atr WHERE atr.artwork_id = a.id AND atr.tag_id = #{tagId} AND atr.is_deleted = 0)`，避免 JOIN 带来的数据重复
+  - **修复遗漏**：`ui.is_deleted = 0` 条件补全，确保已取消的点赞/收藏（逻辑删除记录）不混入列表
+  - Service 层 `getCollections` / `getLikes` 方法签名增加 `Long tagId` 参数，Mapper 调用时透传；查询完成后调用 `attachTagsToArtworks` 补全每个作品的标签详情（`List<Tag> tags`）
+  - Controller 层两个接口均以 `@RequestParam(required = false) Long tagId` 接收前端筛选参数，可选参数不传则返回全部
+- **修改的文件**：
+  - `ArtworkMapper.java` — `selectCollectedArtworks` / `selectLikedArtworks` 改用 `<script>` 包裹，方法签名增加 `@Param("tagId") Long tagId`，WHERE 追加 `AND ui.is_deleted = 0` 及 `<if test='tagId != null'>` EXISTS 条件
+  - `UserInteractionService.java` — 接口签名 `getCollections` 增加 `Long tagId` 参数；`getLikes` 增加 `Long tagId` 参数
+  - `UserInteractionServiceImpl.java` — 注入 `ArtworkTagRelationService` 和 `TagService`；新增私有方法 `attachTagsToArtworks` 遍历填充标签；`getCollections` / `getLikes` 方法签名及实现均同步增加 `tagId` 并透传给 Mapper
+  - `UserInteractionController.java` — `getCollections` 和 `getLikes` 两接口增加 `@RequestParam(required = false) Long tagId` 参数，透传给 Service
+- **遗留问题/下一步**：前端接入 `?tagId=xxx` 参数实现标签筛选 UI 联动；`attachTagsToArtworks` 存在 N+1 查询问题，后续可优化为批量一次查出所有作品的标签关联
+
+---
+
 - **日期**：2026-03-22
 - **完成功能**：作品流接口支持按标签（tagId）筛选过滤
 - **核心技术点**：
@@ -284,3 +313,46 @@
   - `UserService.java` — 新增 `boolean updateSettings(Long userId, UserSettingsDTO dto)` 接口声明
   - `UserServiceImpl.java` — `updateProfile` 追加 `bio`/`gender` 赋值；新增 `updateSettings` 实现（构造 User → set 四个字段 → updateById）
   - `UserController.java` — 新增 `PUT /api/user/settings` 接口，需登录，成功返回"设置更新成功"
+
+---
+
+- **日期**：2026-03-24
+- **完成功能**：新增获取用户收藏列表接口 `GET /api/interaction/collections/{userId}`，集成隐私保护逻辑
+- **核心技术点**：
+  - `ArtworkMapper.selectCollectedArtworks`：`INNER JOIN user_interaction` 按 `interaction_type=2`（收藏）过滤，`ORDER BY ui.create_time DESC` 按收藏时间倒序
+  - `UserInteractionServiceImpl.getCollections` 隐私三层判断：①用户不存在返回 404；②非本人且对方 `hideCollections=1` 返回 403 "该用户已隐藏收藏列表"；③否则正常返回收藏列表
+  - `Integer.valueOf(1)` 替代直接比较 `==`，规避自动拆箱 NPE
+  - Service 层注入 `UserMapper`（用于查询目标用户隐私设置）和 `ArtworkMapper`（用于执行收藏列表 SQL）
+- **修改的文件**：
+  - `ArtworkMapper.java` — 新增 `selectCollectedArtworks` 方法（`@Select` 联表查询）
+  - `UserInteractionService.java` — 新增 `Result<List<Artwork>> getCollections(Long targetUserId, Long currentUserId)` 接口声明
+  - `UserInteractionServiceImpl.java` — 注入 `UserMapper`、`ArtworkMapper`；实现 `getCollections` 隐私检查 + 收藏列表查询
+  - `UserInteractionController.java` — 新增 `GET /api/interaction/collections/{userId}` 接口，需登录，从 `request` 提取 `currentUserId`
+
+---
+
+- **日期**：2026-03-24
+- **完成功能**：新增点赞列表接口 `GET /api/interaction/likes/{userId}`，同时修正收藏列表 SQL 关联字段
+- **核心技术点**：
+  - `UserInteraction` 实体字段为 `artworkId`，而**非** `targetId`；之前收藏 SQL 错误地用了 `ui.target_id`，本次一并修正为 `ui.artwork_id`，确保收藏/点赞两条 SQL 均正确
+  - `getLikes` 与 `getCollections` 对比：点赞列表默认公开，无需传 `currentUserId` 做隐私校验，直接查询返回即可；收藏列表受 `hideCollections` 字段控制
+  - `selectLikedArtworks` 与 `selectCollectedArtworks` SQL 结构一致，仅 `interaction_type` 分别为 `1`（点赞）和 `2`（收藏）
+- **修改的文件**：
+  - `ArtworkMapper.java` — `selectCollectedArtworks` SQL 修正 `ui.target_id` → `ui.artwork_id`；新增 `selectLikedArtworks`（`interaction_type=1`）
+  - `UserInteractionService.java` — 新增 `Result<List<Artwork>> getLikes(Long targetUserId)` 接口声明
+  - `UserInteractionServiceImpl.java` — 实现 `getLikes`：查询用户存在性 → 调用 `artworkMapper.selectLikedArtworks` → `Result.success`
+  - `UserInteractionController.java` — 新增 `GET /api/interaction/likes/{userId}` 接口，无需登录
+
+---
+
+- **日期**：2026-03-24
+- **完成功能**：点赞/收藏列表返回类型由 `Artwork` 升级为 `ArtworkVO`，与"我的发布"Feed 展示字段完全对齐
+- **核心技术点**：
+  - `ArtworkVO` 相比 `Artwork` 额外包含 `authorName`（作者昵称）、`categoryName`（分类名），前端展示卡片时无需二次查询
+  - `selectCollectedArtworks` 和 `selectLikedArtworks` SQL 均改为联表 `LEFT JOIN user u`、`LEFT JOIN category c`，显式列出目标字段而非 `SELECT a.*`，避免返回冗余字段
+  - Mapper 返回类型 `List<Artwork>` → `List<ArtworkVO>`，Service 层 `List<Artwork>` → `List<ArtworkVO>`，Controller 层 `Result<List<Artwork>>` → `Result<List<ArtworkVO>>`，三层泛型同步修正，保持一致性
+- **修改的文件**：
+  - `ArtworkMapper.java` — 两条 SQL 均改为显式字段列表 + `LEFT JOIN` 联表，返回类型改为 `List<ArtworkVO>`
+  - `UserInteractionService.java` — `getCollections`、`getLikes` 返回类型从 `Result<List<Artwork>>` 改为 `Result<List<ArtworkVO>>`
+  - `UserInteractionServiceImpl.java` — 实现类对应方法同步改为 `List<ArtworkVO>`
+  - `UserInteractionController.java` — 两接口返回类型同步改为 `Result<List<ArtworkVO>>`
