@@ -16,15 +16,18 @@ import com.creation.platform.service.ArtworkTagRelationService;
 import com.creation.platform.service.TagService;
 import com.creation.platform.vo.ArtworkVO;
 import com.creation.platform.vo.DashboardVO;
+import com.creation.platform.vo.InteractionTrendVO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
+import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 @Service
@@ -46,15 +49,18 @@ public class ArtworkServiceImpl extends ServiceImpl<ArtworkMapper, Artwork> impl
     private TagService tagService;
 
     @Override
-    public Page<ArtworkVO> getAdminArtworkPage(Integer current, Integer size, String title, Long categoryId, Integer status) {
+    public Page<ArtworkVO> getAdminArtworkPage(Integer current, Integer size, String title, Long categoryId,
+            Integer status) {
         Page<ArtworkVO> page = new Page<>(current, size);
         return artworkMapper.selectArtworkPage(page, title, categoryId, status);
     }
 
     @Override
-    public Page<ArtworkVO> getFeedPage(Integer current, Integer size, Long tagId, Long categoryId, Long userId, Long followerId, String sortType, String keyword) {
+    public Page<ArtworkVO> getFeedPage(Integer current, Integer size, Long tagId, Long categoryId, Long userId,
+            Long followerId, String sortType, String keyword) {
         Page<ArtworkVO> page = new Page<>(current, size);
-        Page<ArtworkVO> pageResult = artworkMapper.selectFeedPage(page, tagId, categoryId, userId, followerId, sortType, keyword);
+        Page<ArtworkVO> pageResult = artworkMapper.selectFeedPage(page, tagId, categoryId, userId, followerId, sortType,
+                keyword);
 
         // 为信息流中的每篇文章组装标签数据
         if (pageResult.getRecords() != null) {
@@ -190,5 +196,57 @@ public class ArtworkServiceImpl extends ServiceImpl<ArtworkMapper, Artwork> impl
         }
 
         return artwork.getId();
+    }
+
+    @Override
+    public DashboardVO getCreatorDashboardStats(Long userId) {
+        return baseMapper.getCreatorDashboardStats(userId);
+    }
+
+    @Override
+    public List<InteractionTrendVO> getRecentInteractionTrend(Long userId) {
+        List<InteractionTrendVO> interactions = baseMapper.getRecentInteractionTrend(userId);
+        List<InteractionTrendVO> fans = baseMapper.getRecentFanTrend(userId);
+        List<InteractionTrendVO> artworks = baseMapper.getRecentArtworkTrend(userId);
+
+        Map<String, InteractionTrendVO> map = new HashMap<>();
+
+        interactions.forEach(item -> map.put(item.getDate(), item));
+
+        fans.forEach(item -> {
+            InteractionTrendVO vo = map.getOrDefault(item.getDate(), new InteractionTrendVO());
+            vo.setDate(item.getDate());
+            vo.setFanCount(item.getFanCount());
+            map.put(item.getDate(), vo);
+        });
+
+        artworks.forEach(item -> {
+            InteractionTrendVO vo = map.getOrDefault(item.getDate(), new InteractionTrendVO());
+            vo.setDate(item.getDate());
+            vo.setArtworkCount(item.getArtworkCount());
+            map.put(item.getDate(), vo);
+        });
+
+        List<InteractionTrendVO> result = new ArrayList<>(map.values());
+        result.sort(Comparator.comparing(InteractionTrendVO::getDate));
+        return result;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateArtwork(Long id, ArtworkPublishDTO dto) {
+        // 1. 更新作品基本信息
+        Artwork artwork = new Artwork();
+        BeanUtils.copyProperties(dto, artwork);
+        artwork.setId(id);
+        if (dto.getContent() != null) {
+            artwork.setWordCount(dto.getContent().length());
+        }
+        this.updateById(artwork);
+
+        // 2. 更新标签关联（先全删，再全加）
+        if (dto.getTagIds() != null) {
+            artworkTagRelationService.setTags(id, dto.getTagIds());
+        }
     }
 }

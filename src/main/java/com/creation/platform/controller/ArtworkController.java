@@ -2,7 +2,7 @@
  * @Author: dingxiuchen 2745250790@qq.com
  * @Date: 2026-03-15 16:59:00
  * @LastEditors: dingxiuchen 2745250790@qq.com
- * @LastEditTime: 2026-03-18 19:36:49
+ * @LastEditTime: 2026-03-25 12:07:20
  * @FilePath: \build-one\src\main\java\com\creation\platform\controller\ArtworkController.java
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -15,11 +15,13 @@ import com.creation.platform.entity.Artwork;
 import com.creation.platform.entity.Result;
 import com.creation.platform.service.ArtworkService;
 import com.creation.platform.vo.ArtworkVO;
-import jakarta.servlet.http.HttpServletRequest;
+import com.creation.platform.vo.DashboardVO;
+import com.creation.platform.vo.InteractionTrendVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-
+import jakarta.servlet.http.HttpServletRequest; // 如果是老版本 SpringBoot 请用 javax.servlet.http.HttpServletRequest
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/artwork")
@@ -32,11 +34,11 @@ public class ArtworkController {
      * 公开作品流接口
      * 查询所有已发布(status=1)且未删除(is_deleted=0)的作品，按时间倒序分页返回
      *
-     * @param current     当前页码，默认第1页
-     * @param size        每页数量，默认10条
-     * @param tagId       标签ID（可选，为 null 时返回全部作品）
-     * @param categoryId  分类ID（可选，为 null 时返回全部作品）
-     * @param userId      用户ID（可选，为 null 时返回全局作品流，为非空时返回该用户的作品列表）
+     * @param current      当前页码，默认第1页
+     * @param size         每页数量，默认10条
+     * @param tagId        标签ID（可选，为 null 时返回全部作品）
+     * @param categoryId   分类ID（可选，为 null 时返回全部作品）
+     * @param userId       用户ID（可选，为 null 时返回全局作品流，为非空时返回该用户的作品列表）
      * @param isFollowFeed 关注流标识（可选，true 时仅返回当前登录用户关注的人发布的作品）
      * @param sortType     排序方式（可选，默认 recommend；recommend=热度推荐，time=最新发布）
      * @param keyword      关键字（可选，同时模糊匹配标题和简介）
@@ -60,7 +62,8 @@ public class ArtworkController {
                 return Result.error(401, "请先登录查看关注动态");
             }
         }
-        Page<ArtworkVO> page = artworkService.getFeedPage(current, size, tagId, categoryId, userId, followerId, sortType, keyword);
+        Page<ArtworkVO> page = artworkService.getFeedPage(current, size, tagId, categoryId, userId, followerId,
+                sortType, keyword);
         return Result.success(page);
     }
 
@@ -119,14 +122,22 @@ public class ArtworkController {
         return artworkService.save(artwork);
     }
 
-    @PutMapping
-    public boolean updateById(@RequestBody Artwork artwork) {
-        return artworkService.updateById(artwork);
+    /**
+     * 修改正式作品（修复 400 错误并支持标签更新）
+     */
+    @PutMapping("/update")
+    public Result<Void> updateArtwork(@RequestBody ArtworkPublishDTO dto, @RequestParam("id") Long id) {
+        artworkService.updateArtwork(id, dto);
+        return Result.success();
     }
 
+    /**
+     * 删除正式作品（逻辑删除）
+     */
     @DeleteMapping("/{id}")
-    public boolean removeById(@PathVariable Long id) {
-        return artworkService.removeById(id);
+    public Result<Void> deleteArtwork(@PathVariable Long id) {
+        artworkService.removeById(id);
+        return Result.success();
     }
 
     @PutMapping("/view/{id}")
@@ -180,5 +191,27 @@ public class ArtworkController {
         Long userId = (Long) request.getAttribute("userId");
         Long artworkId = artworkService.publishArtwork(userId, dto);
         return Result.success(artworkId);
+    }
+
+    /**
+     * 获取创作者个人数据统计
+     *
+     * @param userId 创作者用户ID
+     * @return 创作者统计数据（作品数、总浏览量、总点赞数、粉丝数）
+     */
+    @GetMapping("/dashboard/stats/{userId}")
+    public Result<DashboardVO> getDashboardStats(@PathVariable Long userId) {
+        return Result.success(artworkService.getCreatorDashboardStats(userId));
+    }
+
+    /**
+     * 获取创作者近7天互动趋势（每日点赞数和收藏数）
+     *
+     * @param userId 创作者用户ID
+     * @return 近7天每日互动数据列表
+     */
+    @GetMapping("/dashboard/trend/{userId}")
+    public Result<List<InteractionTrendVO>> getDashboardTrend(@PathVariable Long userId) {
+        return Result.success(artworkService.getRecentInteractionTrend(userId));
     }
 }

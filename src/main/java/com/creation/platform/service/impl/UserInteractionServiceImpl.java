@@ -11,6 +11,7 @@ import com.creation.platform.mapper.ArtworkMapper;
 import com.creation.platform.mapper.UserInteractionMapper;
 import com.creation.platform.mapper.UserMapper;
 import com.creation.platform.service.ArtworkTagRelationService;
+import com.creation.platform.service.NotificationService;
 import com.creation.platform.service.TagService;
 import com.creation.platform.service.UserInteractionService;
 import com.creation.platform.vo.ArtworkVO;
@@ -35,13 +36,26 @@ public class UserInteractionServiceImpl extends ServiceImpl<UserInteractionMappe
     private ArtworkTagRelationService artworkTagRelationService;
 
     @Autowired
+    private NotificationService notificationService;
+
+    @Autowired
     private TagService tagService;
 
     @Override
     public boolean toggleInteraction(Long userId, InteractionDTO dto) {
         userInteractionMapper.toggleOrInsert(userId, dto.getArtworkId(), dto.getInteractionType());
         Integer isDeleted = userInteractionMapper.getInteractionStatus(userId, dto.getArtworkId(), dto.getInteractionType());
-        return isDeleted != null && isDeleted == 0;
+        boolean isAdded = (isDeleted != null && isDeleted == 0);
+
+        // --- 埋点：触发点赞/收藏通知 (type: 1=点赞 2=收藏) ---
+        if (isAdded) {
+            com.creation.platform.entity.Artwork artwork = artworkMapper.selectById(dto.getArtworkId());
+            if (artwork != null) {
+                notificationService.sendNotification(artwork.getUserId(), userId, dto.getInteractionType(), artwork.getId(), null);
+            }
+        }
+
+        return isAdded;
     }
 
     @Override

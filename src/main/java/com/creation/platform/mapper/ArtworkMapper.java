@@ -135,4 +135,46 @@ public interface ArtworkMapper extends BaseMapper<Artwork> {
                 "ORDER BY ui.create_time DESC" +
                 "</script>")
         List<com.creation.platform.vo.ArtworkVO> selectLikedArtworks(@Param("userId") Long userId, @Param("tagId") Long tagId);
+
+        /**
+         * 获取创作者个人数据统计（作品数、总浏览量、总点赞数、粉丝数）
+         */
+        @Select("SELECT " +
+                "  (SELECT COUNT(*) FROM artwork WHERE user_id = #{userId} AND is_deleted = 0) AS artworkCount, " +
+                "  (SELECT IFNULL(SUM(view_count), 0) FROM artwork WHERE user_id = #{userId} AND is_deleted = 0) AS totalViews, " +
+                "  (SELECT COUNT(*) FROM user_interaction ui INNER JOIN artwork a ON ui.artwork_id = a.id WHERE a.user_id = #{userId} AND ui.interaction_type = 1 AND ui.is_deleted = 0 AND a.is_deleted = 0) AS totalLikes, " +
+                "  (SELECT COUNT(*) FROM user_follow WHERE followee_id = #{userId} AND is_deleted = 0) AS totalFollowers " +
+                "FROM DUAL")
+        com.creation.platform.vo.DashboardVO getCreatorDashboardStats(@Param("userId") Long userId);
+
+        /**
+         * 获取创作者近7天互动趋势（每日点赞数和收藏数）
+         */
+        @Select("SELECT DATE_FORMAT(ui.create_time, '%Y-%m-%d') AS date, " +
+                "CAST(SUM(CASE WHEN ui.interaction_type = 1 THEN 1 ELSE 0 END) AS SIGNED) AS likeCount, " +
+                "CAST(SUM(CASE WHEN ui.interaction_type = 2 THEN 1 ELSE 0 END) AS SIGNED) AS collectCount " +
+                "FROM user_interaction ui " +
+                "JOIN artwork a ON ui.artwork_id = a.id " +
+                "WHERE a.user_id = #{userId} AND ui.create_time >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) AND ui.is_deleted = 0 " +
+                "GROUP BY DATE_FORMAT(ui.create_time, '%Y-%m-%d') " +
+                "ORDER BY date ASC")
+        List<com.creation.platform.vo.InteractionTrendVO> getRecentInteractionTrend(@Param("userId") Long userId);
+
+        /**
+         * 获取创作者近7天粉丝趋势（每日新增粉丝数）
+         */
+        @Select("SELECT DATE_FORMAT(create_time, '%Y-%m-%d') AS date, COUNT(*) AS fanCount " +
+                "FROM user_follow " +
+                "WHERE followee_id = #{userId} AND create_time >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) AND is_deleted = 0 " +
+                "GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d')")
+        List<com.creation.platform.vo.InteractionTrendVO> getRecentFanTrend(@Param("userId") Long userId);
+
+        /**
+         * 获取创作者近7天作品趋势（每日新增作品数）
+         */
+        @Select("SELECT DATE_FORMAT(create_time, '%Y-%m-%d') AS date, COUNT(*) AS artworkCount " +
+                "FROM artwork " +
+                "WHERE user_id = #{userId} AND status = 1 AND create_time >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) AND is_deleted = 0 " +
+                "GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d')")
+        List<com.creation.platform.vo.InteractionTrendVO> getRecentArtworkTrend(@Param("userId") Long userId);
 }

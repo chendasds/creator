@@ -14,6 +14,7 @@ import com.creation.platform.dto.UserUpdateDTO;
 import com.creation.platform.entity.Result;
 import com.creation.platform.entity.User;
 import com.creation.platform.mapper.UserMapper;
+import com.creation.platform.service.NotificationService;
 import com.creation.platform.service.UserService;
 import com.creation.platform.utils.JwtUtils;
 import com.creation.platform.vo.UserStatsVO;
@@ -34,6 +35,9 @@ public class UserController {
 
     @Autowired
     private UserMapper userMapper;
+
+    @Autowired
+    private NotificationService notificationService;
 
     @GetMapping("/{id}")
     public User getById(@PathVariable Long id) {
@@ -181,5 +185,80 @@ public class UserController {
             return Result.success(java.util.Collections.emptyList());
         }
         return Result.success(userMapper.searchUsers(keyword.trim()));
+    }
+
+    /**
+     * 后台管理：分页查询用户列表（支持按用户名/昵称搜索，按状态过滤）
+     */
+    @GetMapping("/admin/page")
+    public Result<com.baomidou.mybatisplus.extension.plugins.pagination.Page<User>> adminPage(
+            @RequestParam(defaultValue = "1") Integer current,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer status) {
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<User> page = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(current, size);
+        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<User> wrapper = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+
+        // 模糊匹配用户名或昵称
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            wrapper.and(w -> w.like(User::getUsername, keyword).or().like(User::getNickname, keyword));
+        }
+        // 按状态过滤
+        if (status != null) {
+            wrapper.eq(User::getStatus, status);
+        }
+
+        wrapper.orderByDesc(User::getCreateTime);
+        return Result.success(userService.page(page, wrapper));
+    }
+
+    /**
+     * 后台管理：修改用户信息并推送系统通知（防弹增强版）
+     */
+    @PutMapping("/admin/update")
+    public Result<Void> adminUpdateUser(HttpServletRequest request, @RequestBody User user) {
+        if (user.getId() == null) return Result.error("用户ID不能为空");
+
+        Long adminId = (Long) request.getAttribute("userId");
+        User oldUser = userService.getById(user.getId());
+        if (oldUser == null) return Result.error("用户不存在");
+
+        StringBuilder changes = new StringBuilder();
+
+        // --- 核心修复：增加 null 检查，只有前端传了值且与旧值不同才记录 ---
+
+        // 1. 角色变更
+        if (user.getRole() != null && !user.getRole().equals(oldUser.getRole())) {
+            changes.append("【权限】改为").append(user.getRole() == 2 ? "管理员" : "普通用户").append("; ");
+        }
+        // 2. 状态变更
+        if (user.getStatus() != null && !user.getStatus().equals(oldUser.getStatus())) {
+            changes.append("【状态】改为").append(user.getStatus() == 1 ? "正常" : "禁用").append("; ");
+        }
+        // 3. 昵称重置
+        if (user.getNickname() != null && !user.getNickname().equals(oldUser.getNickname())) {
+            changes.append("【昵称】已被重置; ");
+        }
+        // 4. 手机号变更
+        if (user.getPhone() != null && !user.getPhone().equals(oldUser.getPhone())) {
+            changes.append("【手机号】已更新; ");
+        }
+        // 5. 性别变更
+        if (user.getGender() != null && !user.getGender().equals(oldUser.getGender())) {
+            String g = user.getGender() == 1 ? "男" : (user.getGender() == 2 ? "女" : "保密");
+            changes.append("【性别】改为").append(g).append("; ");
+        }
+
+        // 执行更新
+        userService.updateById(user);
+
+        // 发送通知
+        if (changes.length() > 0) {
+            notificationService.sendNotification(
+                    user.getId(), adminId, 5, null,
+                    "管理员修改了您的账号资料: " + changes.toString()
+            );
+        }
+        return Result.success();
     }
 }

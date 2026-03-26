@@ -2,6 +2,96 @@
 
 ---
 
+- **日期**：2026-03-25
+- **完成功能**：通知服务扩展 - 全站广播通知功能
+- **核心技术点**：
+  - `NotificationService` 新增 `broadcast(Long adminId, String content)` 方法声明
+  - `NotificationServiceImpl` 实现：`@Async` + `@Transactional` + `saveBatch` 批量插入，过滤发送者自己
+  - `NotificationController` 新增 `POST /api/notification/broadcast` 接口，需管理员身份
+- **修改的文件**：
+  - `NotificationService.java` — 新增 `broadcast` 方法声明
+  - `NotificationServiceImpl.java` — 注入 `UserService`，实现 `broadcast` 方法
+  - `NotificationController.java` — 新增 `sendBroadcast` 接口
+- **新增接口**：
+  - `POST /api/notification/broadcast` — 管理员向全站用户推送系统通知
+- **遗留问题/下一步**：前端后台管理系统接入广播功能；可考虑增加广播历史记录
+
+---
+
+- **日期**：2026-03-25
+- **完成功能**：后台管理用户修改时自动推送系统通知（防弹增强版）
+- **核心技术点**：
+  - `adminUpdateUser` 方法增加 `null` 检查，只有前端传了值且与旧值不同才记录变更，防止 NPE
+  - 追踪字段：权限（role）、状态（status）、昵称（nickname）、手机号（phone）、性别（gender）
+  - 性别变更支持男/女/保密三种状态显示
+  - 有实质变动时调用 `notificationService.sendNotification` 推送系统通知（type=5）
+- **修改的文件**：
+  - `UserController.java` — 完善 `adminUpdateUser` 增加 null 检查和 phone/gender 字段变更追踪
+- **修改的接口**：
+  - `PUT /api/user/admin/update` — 后台修改用户信息时，若关键字段变更则向被修改用户推送系统通知
+- **遗留问题/下一步**：前端接入通知列表接口展示系统通知；可考虑通知中心页面
+
+---
+
+- **日期**：2026-03-25
+- **完成功能**：顶部私信入口全局未读红点提醒接口
+- **核心技术点**：
+  - `PrivateMessageMapper.countTotalUnread`：统计 `receiver_id = #{userId} AND is_read = 0 AND is_deleted = 0` 的消息总数
+  - `PrivateMessageService.getTotalUnread` → `PrivateMessageServiceImpl` 实现调用 Mapper
+  - Controller 层新增 `GET /api/chat/unreadCount/{userId}` 接口，前端可在任意页面调用获取未读数
+- **修改的文件**：
+  - `PrivateMessageMapper.java` — 新增 `countTotalUnread` 方法
+  - `PrivateMessageService.java` — 新增 `getTotalUnread` 接口声明
+  - `PrivateMessageServiceImpl.java` — 实现 `getTotalUnread`
+  - `PrivateMessageController.java` — 新增 `GET /api/chat/unreadCount/{userId}` 接口
+- **新增接口**：
+  - `GET /api/chat/unreadCount/{userId}` — 返回用户全局未读私信数量
+- **遗留问题/下一步**：前端接入该接口，在顶部私信入口显示红点；可考虑 WebSocket 实时推送未读数变化
+
+---
+
+- **日期**：2026-03-25
+- **完成功能**：创作者数据看板 - 近7天趋势数据扩展（点赞/收藏/粉丝/作品四维度）
+- **核心技术点**：
+  - `InteractionTrendVO` 扩展：新增 `fanCount`（每日新增粉丝数）、`artworkCount`（每日新增作品数）两个字段，默认值为 `0L`
+  - `ArtworkMapper` 新增两条 SQL：
+    - `getRecentFanTrend`：查询 `user_follow` 表，按日期分组统计每日新增粉丝数
+    - `getRecentArtworkTrend`：查询 `artwork` 表，`status=1` 过滤已发布作品，按日期分组统计每日新增作品数
+  - `getRecentInteractionTrend` Service 层改造：分别调用三个 Mapper 方法 → 使用 `HashMap` 按日期聚合归类 → `Comparator.comparing` 按日期升序排序
+  - 使用 `Map.getOrDefault` 模式，当某天只有部分数据时能正确合并（点赞/收藏/粉丝/作品四维度独立查询、按日期归并）
+- **修改的文件**：
+  - `InteractionTrendVO.java` — 新增 `fanCount`、`artworkCount` 两个字段及默认值 `= 0L`
+  - `ArtworkMapper.java` — 新增 `getRecentFanTrend` 和 `getRecentArtworkTrend` 两个方法
+  - `ArtworkServiceImpl.java` — 重写 `getRecentInteractionTrend`，三维度数据合并逻辑
+- **接口返回示例**：
+```json
+[
+  { "date": "2026-03-19", "likeCount": 5, "collectCount": 2, "fanCount": 3, "artworkCount": 1 },
+  { "date": "2026-03-20", "likeCount": 8, "collectCount": 3, "fanCount": 0, "artworkCount": 0 }
+]
+```
+- **遗留问题/下一步**：前端 Dashboard.vue 接入该接口渲染四条趋势曲线；可考虑扩展浏览量趋势
+
+---
+
+- **日期**：2026-03-25
+- **完成功能**：创作者数据看板 - 综合数据统计接口
+- **核心技术点**：
+  - `DashboardVO` 新增创作者统计字段：`artworkCount`（作品数）、`totalViews`（总浏览量）、`totalLikes`（总点赞数）、`totalFollowers`（粉丝数）
+  - `ArtworkMapper.getCreatorDashboardStats`：使用 4 个标量子查询一次 SQL 获取全部指标，`IFNULL(SUM(...), 0)` 处理 null 场景
+  - 粉丝数查询 `user_follow` 表，`followee_id = #{userId}` 表示"关注该用户的人"
+- **修改的文件**：
+  - `DashboardVO.java` — 新增 `artworkCount`、`totalViews`、`totalLikes`、`totalFollowers` 四个字段
+  - `ArtworkMapper.java` — 新增 `getCreatorDashboardStats` 方法
+  - `ArtworkService.java` — 新增 `getCreatorDashboardStats` 接口声明
+  - `ArtworkServiceImpl.java` — 实现 `getCreatorDashboardStats`
+  - `ArtworkController.java` — 新增 `GET /api/artwork/dashboard/stats/{userId}` 接口
+- **新增接口**：
+  - `GET /api/artwork/dashboard/stats/{userId}` — 返回创作者四项核心指标
+- **遗留问题/下一步**：前端 Dashboard.vue 接入该接口展示统计卡片
+
+---
+
 - **日期**：2026-03-24
 - **完成功能**：点赞/收藏列表 SQL 补全点赞数（likeCount）和评论数（commentCount）
 - **核心技术点**：
@@ -356,3 +446,174 @@
   - `UserInteractionService.java` — `getCollections`、`getLikes` 返回类型从 `Result<List<Artwork>>` 改为 `Result<List<ArtworkVO>>`
   - `UserInteractionServiceImpl.java` — 实现类对应方法同步改为 `List<ArtworkVO>`
   - `UserInteractionController.java` — 两接口返回类型同步改为 `Result<List<ArtworkVO>>`
+
+
+  - **日期**：2026-03-24
+- **完成功能**：新增关注列表和粉丝列表查询接口
+- **核心技术点**：
+  - `UserFollowMapper` 新增 `selectFollowings` / `selectFollowers` 两个联表查询，均返回 `User` 实体列表，包含 `id / username / nickname / avatarUrl / bio / gender` 六个字段
+  - `selectFollowings`：`INNER JOIN user_follow uf ON u.id = uf.followee_id`，WHERE 条件 `uf.follower_id = #{userId}` 表示"我关注的"
+  - `selectFollowers`：`INNER JOIN user_follow uf ON u.id = uf.follower_id`，WHERE 条件 `uf.followee_id = #{userId}` 表示"关注我的"
+  - 两条 SQL 均过滤 `uf.is_deleted = 0`（已关注状态）和 `u.is_deleted = 0`（用户未被删除），按关注时间倒序
+  - Controller 层两个接口均为公开接口（无需登录），便于前端在个人主页展示关注/粉丝列表
+- **修改的文件**：
+  - `UserFollowMapper.java` — 新增 `selectFollowings` / `selectFollowers` 方法
+  - `UserFollowService.java` — 新增 `getFollowings` / `getFollowers` 接口声明
+  - `UserFollowServiceImpl.java` — 实现 `getFollowings` / `getFollowers`，委托 `baseMapper` 调用
+  - `UserFollowController.java` — 新增 `GET /api/follow/following/{userId}` 和 `GET /api/follow/followers/{userId}` 两个公开接口
+- **遗留问题/下一步**：前端关注/粉丝列表页接入接口；后续可扩展返回是否互相关注字段（当前用户与列表中每个人的关系）；可考虑分页支持（LIMIT / OFFSET）
+
+---
+
+---
+
+- **日期**：2026-03-24
+- **完成功能**：消息通知系统基础架构搭建（第一步：增删改查 + 实体类）
+- **核心技术点**：
+  - 新建 `Notification` 实体类，使用 `@TableLogic` 注解实现逻辑删除，`@TableId(type = IdType.AUTO)` 自增主键，`type` 字段枚举：1-点赞 2-收藏 3-评论 4-关注 5-系统
+  - 新建 `NotificationVO`，包含发送者头像昵称（`senderName`/`senderAvatar`）和目标文章标题（`targetTitle`），前端可直接渲染，无需二次查询
+  - `NotificationMapper` 联表查询使用 `LEFT JOIN artwork a ON n.target_id = a.id AND n.type IN (1, 2, 3)`，通过 JOIN 条件限定仅点赞/收藏/评论类型关联作品表，避免无关系统/关注通知匹配到作品
+  - `NotificationServiceImpl.sendNotification` 使用 `@Async` 注解异步执行，不阻塞主业务逻辑（点赞/评论/关注等），自操作（`receiverId == senderId`）直接跳过
+  - `readAll` 使用 `LambdaUpdateWrapper` 批量更新未读为已读，避免逐条更新开销
+  - `CreationPlatformApplication` 启动类添加 `@EnableAsync` 注解激活异步支持
+- **新建的文件**：
+  - `entity/Notification.java` — 实体类
+  - `vo/NotificationVO.java` — 视图对象
+  - `mapper/NotificationMapper.java` — Mapper 接口（含联表查询 + 未读计数）
+  - `service/NotificationService.java` — Service 接口
+  - `service/impl/NotificationServiceImpl.java` — Service 实现（含 @Async 发通知）
+  - `controller/NotificationController.java` — Controller（含列表/已读/未读数三个接口）
+- **修改的文件**：
+  - `CreationPlatformApplication.java` — 新增 `@EnableAsync` 注解
+- **遗留问题/下一步**：
+  - 第二步：在 `UserInteractionServiceImpl.toggleInteraction`（点赞/收藏）、评论相关 Service、关注 Service 中埋点调用 `sendNotification` ← 已完成
+  - 前端接入三个通知接口
+  - 后续可扩展单个通知标记已读、通知分页、通知类型过滤等高级功能
+
+---
+
+---
+
+- **日期**：2026-03-24
+- **完成功能**：消息通知系统全链路埋点（第二步：在点赞/收藏、评论、关注业务中触发通知）
+- **核心技术点**：
+  - **点赞/收藏埋点**（`UserInteractionServiceImpl.toggleInteraction`）：在 `toggleOrInsert` 之后判断 `isAdded == true` 时，异步发送通知给作品作者；`dto.getInteractionType()` 直接对应 notification.type（1=点赞 2=收藏），无需额外映射；自操作由 `sendNotification` 内部 `receiverId == senderId` 判断自动跳过
+  - **评论埋点**（`CommentServiceImpl.addComment`）：在 `this.save(comment)` 之后埋点；支持楼中楼逻辑：若有 `parentId` 则通知被回复的人，否则通知作品作者
+  - **关注埋点**（`UserFollowServiceImpl.toggleFollow`）：在 toggle 之前先查询 `beforeStatus` 记录变更前状态，toggle 之后通过 `!wasFollowing && success` 判断是否真正新增关注，避免取消再关注时重复发通知
+- **修改的文件**：
+  - `UserInteractionServiceImpl.java` — 注入 `NotificationService`，`toggleInteraction` 方法中埋点点赞/收藏通知
+  - `CommentServiceImpl.java` — 注入 `NotificationService` + `ArtworkMapper`，`addComment` 方法中埋点评论通知
+  - `UserFollowServiceImpl.java` — 注入 `NotificationService`，`toggleFollow` 方法中埋点关注通知
+- **遗留问题/下一步**：前端接入通知列表/已读/未读数接口；后续可扩展单个通知标记已读；可扩展通知类型过滤；系统通知（type=5）暂无触发场景
+
+---
+
+- **日期**：2026-03-25
+- **完成功能**：私信系统基础架构搭建（Entity / VO / Mapper / Service / Controller 五层架构）
+- **核心技术点**：
+  - 新建 `PrivateMessage` 实体类，使用 `@TableLogic` 注解实现逻辑删除，`@TableField(fill = FieldFill.INSERT)` 自动填充创建时间
+  - 新建 `ConversationVO` 用于会话列表，包含对方用户信息、最后一条消息、未读数等；`PrivateMessageVO` 用于详细聊天记录，包含发送者头像昵称
+  - `PrivateMessageMapper` 两个方法：`selectChatHistory` 联表查询两人聊天记录（按时间正序），`markAsRead` 批量将未读消息标记为已读
+  - `PrivateMessageServiceImpl.getConversationList` 实现会话列表分组逻辑：按对方用户ID分组 → 取每组最后一条消息 → 统计未读数 → 查询对方头像昵称 → 按最后消息时间倒序
+  - Controller 层三个公开接口：`GET /api/chat/conversations/{userId}`（会话列表）、`GET /api/chat/history/{currentUserId}/{targetUserId}`（聊天记录）、`POST /api/chat/send`（发送消息）
+- **新建的文件**：
+  - `entity/PrivateMessage.java` — 实体类：`id / senderId / receiverId / content / isRead / createTime / isDeleted`
+  - `vo/ConversationVO.java` — 会话视图对象：`targetUserId / targetUserName / targetUserAvatar / lastMessage / lastMessageTime / unreadCount`
+  - `vo/PrivateMessageVO.java` — 消息视图对象：`id / senderId / receiverId / senderName / senderAvatar / content / isRead / createTime`
+  - `mapper/PrivateMessageMapper.java` — Mapper 接口：`selectChatHistory`（联表查询聊天记录）、`markAsRead`（批量已读）
+  - `service/PrivateMessageService.java` — Service 接口：三个方法声明
+  - `service/impl/PrivateMessageServiceImpl.java` — Service 实现：`sendMessage`（保存消息）、`getChatHistory`（获取记录并已读）、`getConversationList`（会话列表分组聚合）
+  - `controller/PrivateMessageController.java` — Controller：三个业务接口
+- **遗留问题/下一步**：前端接入三个私信接口；后续可扩展消息分页（大量聊天记录时）；可考虑消息撤回功能；私信接口目前为公开接口，可根据需求增加登录校验
+
+---
+
+---
+
+- **日期**：2026-03-25
+- **完成功能**：草稿系统 Controller 层（保存/列表/详情/删除四个接口）
+- **核心技术点**：
+  - 新建 `CreationRecordController`，提供草稿的 CRUD 基础接口
+  - `POST /api/draft/save`：调用 `creationRecordService.saveOrUpdate`，MyBatis-Plus 自动根据有无 ID 判断 Insert 或 Update
+  - `GET /api/draft/list/{userId}`：按 `updateTime` 倒序返回用户所有草稿
+  - `GET /api/draft/{id}`：获取单篇草稿详情，用于编辑回显
+  - `DELETE /api/draft/{id}`：逻辑删除草稿（`@TableLogic` 注解）
+- **新建的文件**：
+  - `controller/CreationRecordController.java` — 四个草稿接口
+- **新增接口**：
+  - `POST /api/draft/save` — 保存或更新草稿
+  - `GET /api/draft/list/{userId}` — 获取用户草稿列表
+  - `GET /api/draft/{id}` — 获取草稿详情
+  - `DELETE /api/draft/{id}` — 删除草稿
+- **遗留问题/下一步**：前端编辑器页接入草稿保存功能（自动保存 + 手动保存）；可考虑增加草稿发布功能（一键将草稿转为正式作品）
+
+---
+
+---
+
+- **日期**：2026-03-25
+- **完成功能**：正式作品修改/删除接口规范化为统一返回格式
+- **核心技术点**：
+  - 将原有的 `updateById` 和 `removeById` 两个接口路径改为更语义化的 `/update` 和复用 `/{id}`
+  - 返回类型由 `boolean` 统一改为 `Result<Void>`，与项目中其他接口保持一致
+  - 删除操作依赖 `Artwork` 实体上的 `@TableLogic` 注解实现逻辑删除
+- **修改的文件**：
+  - `ArtworkController.java` — 重构 `updateById` → `updateArtwork`、`removeById` → `deleteArtwork`，返回类型统一为 `Result<Void>`
+- **修改的接口**：
+  - `PUT /api/artwork/update` — 修改正式作品
+  - `DELETE /api/artwork/{id}` — 删除正式作品（逻辑删除）
+- **遗留问题/下一步**：前端作品管理页接入修改/删除接口；可考虑增加权限校验（仅作者本人可修改/删除自己的作品）
+
+---
+
+---
+
+- **日期**：2026-03-25
+- **完成功能**：正式作品修改接口（含标签关联更新 + 事务保证 + 400 错误修复）
+- **核心技术点**：
+  - Controller 层改造 `updateArtwork` 方法：参数顺序调整为 `(@RequestBody ArtworkPublishDTO dto, @RequestParam("id") Long id)`，**将 dto 放前面解决 Spring 请求体参数丢失问题，显式指定 `@RequestParam("id")` 明确绑定 id 参数**
+  - Service 层新增 `updateArtwork` 方法，使用 `@Transactional(rollbackFor = Exception.class)` 保证事务：先 `BeanUtils.copyProperties` 复制属性 → `updateById` 更新作品 → 调用 `artworkTagRelationService.setTags` 更新标签关联
+  - `setTags` 内部先逻辑删除旧关联再插入新关联，确保作品与标签的一致性
+- **修改的文件**：
+  - `ArtworkController.java` — `updateArtwork` 方法签名改为 `(@RequestBody ArtworkPublishDTO dto, @RequestParam("id") Long id)`
+  - `ArtworkService.java` — 新增 `void updateArtwork(Long id, ArtworkPublishDTO dto)` 接口声明
+  - `ArtworkServiceImpl.java` — 实现 `updateArtwork`，添加 `@Transactional` 注解
+- **修改的接口**：
+  - `PUT /api/artwork/update?id=xxx` — 修改正式作品（body 为 `ArtworkPublishDTO` JSON）
+- **遗留问题/下一步**：前端编辑器接入该接口实现作品修改；可考虑增加权限校验（仅作者本人可修改）
+
+---
+
+- **日期**：2026-03-25
+- **完成功能**：后台管理用户列表查询与修改接口
+- **核心技术点**：
+  - `GET /api/user/admin/page`：分页查询用户列表，支持 `keyword` 模糊匹配用户名或昵称，`status` 按状态过滤，按创建时间倒序
+  - `PUT /api/user/admin/update`：后台修改用户信息（角色 role、状态 status 等），校验 ID 非空后直接调用 MyBatis-Plus 的 `updateById`
+- **修改的文件**：
+  - `UserController.java` — 新增 `adminPage` 和 `adminUpdateUser` 两个后台管理接口
+- **新增接口**：
+  - `GET /api/user/admin/page` — 后台分页查询用户列表
+  - `PUT /api/user/admin/update` — 后台修改用户信息
+- **遗留问题/下一步**：前端后台管理系统接入这些接口；可考虑增加权限校验（仅管理员可访问）
+
+---
+
+---
+
+- **日期**：2026-03-25
+- **完成功能**：后台管理用户修改时自动推送系统通知
+- **核心技术点**：
+  - `UserController` 注入 `NotificationService`
+  - `adminUpdateUser` 方法在执行 `updateById` 之前先查询旧数据（`oldUser`），对比 `role`、`status`、`nickname`、`email` 字段是否有变化
+  - 角色变更：通知包含新角色（管理员/普通用户）
+  - 状态变更：通知包含新状态（正常/禁用）
+  - 昵称变更：通知说明【昵称】已被管理员重置
+  - 邮箱变更：通知说明【绑定邮箱】已更新
+  - 有实质变动时调用 `notificationService.sendNotification(receiverId, senderId, 5, null, content)` 推送系统通知（type=5）
+- **修改的文件**：
+  - `UserController.java` — 新增 `NotificationService` 注入，完善 `adminUpdateUser` 增加更详细的变更追踪和通知逻辑
+- **修改的接口**：
+  - `PUT /api/user/admin/update` — 后台修改用户信息时，若关键字段变更则向被修改用户推送系统通知
+- **遗留问题/下一步**：前端接入通知列表接口展示系统通知；可考虑通知中心页面
+
+---

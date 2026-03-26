@@ -6,7 +6,8 @@ import com.creation.platform.dto.ArtworkPublishDTO;
 import com.creation.platform.entity.Artwork;
 import com.creation.platform.vo.ArtworkVO;
 import com.creation.platform.vo.DashboardVO;
-
+import com.creation.platform.vo.InteractionTrendVO;
+import java.util.List;
 public interface ArtworkService extends IService<Artwork> {
 
     /**
@@ -38,9 +39,25 @@ public interface ArtworkService extends IService<Artwork> {
     ArtworkVO getArtworkDetail(Long id, Long userId);
 
     /**
-     * 获取仪表盘统计数据
+     * 获取仪表盘统计数据（管理员全局统计）
      */
     DashboardVO getDashboardStats();
+
+    /**
+     * 获取创作者个人数据统计
+     *
+     * @param userId 创作者用户ID
+     * @return 创作者统计数据（作品数、总浏览量、总点赞数、粉丝数）
+     */
+    DashboardVO getCreatorDashboardStats(Long userId);
+
+    /**
+     * 获取创作者近7天互动趋势（每日点赞数和收藏数）
+     *
+     * @param userId 创作者用户ID
+     * @return 近7天每日互动数据列表
+     */
+    List<InteractionTrendVO> getRecentInteractionTrend(Long userId);
 
     /**
      * 发布作品
@@ -51,4 +68,13 @@ public interface ArtworkService extends IService<Artwork> {
      * @return 新增成功后的作品ID
      */
     Long publishArtwork(Long userId, ArtworkPublishDTO dto);
+
+    /**
+     * 修改正式作品（包含标签更新）
+     * 更新作品基本信息，并同步更新标签关联关系
+     *
+     * @param id  作品ID
+     * @param dto 修改信息DTO
+     */
+    void updateArtwork(Long id, ArtworkPublishDTO dto);
 }

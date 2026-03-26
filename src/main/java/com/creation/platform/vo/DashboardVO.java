@@ -8,6 +8,7 @@ import java.util.Map;
 @Data
 public class DashboardVO {
 
+    // ==================== 管理员统计字段 ====================
     /** 用户总数 */
     private Long totalUsers;
 
@@ -25,4 +26,17 @@ public class DashboardVO {
 
     /** 七日趋势数据 */
     private Map<String, Object> trendData;
+
+    // ==================== 创作者统计字段 ====================
+    /** 作品数量 */
+    private Long artworkCount;
+
+    /** 总浏览量 */
+    private Long totalViews;
+
+    /** 总点赞数 */
+    private Long totalLikes;
+
+    /** 粉丝数 */
+    private Long totalFollowers;
 }

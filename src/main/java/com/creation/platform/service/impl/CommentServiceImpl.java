@@ -3,9 +3,12 @@ package com.creation.platform.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.creation.platform.dto.CommentDTO;
 import com.creation.platform.entity.Comment;
+import com.creation.platform.mapper.ArtworkMapper;
 import com.creation.platform.mapper.CommentMapper;
 import com.creation.platform.service.CommentService;
+import com.creation.platform.service.NotificationService;
 import com.creation.platform.vo.CommentVO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +20,12 @@ import java.util.Map;
 @Service
 public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> implements CommentService {
 
+    @Autowired
+    private NotificationService notificationService;
+
+    @Autowired
+    private ArtworkMapper artworkMapper;
+
     @Override
     public Long addComment(Long userId, CommentDTO dto) {
         Comment comment = new Comment();
@@ -25,6 +34,20 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         comment.setContent(dto.getContent());
         comment.setParentId(dto.getParentId());
         this.save(comment);
+
+        // --- 埋点：触发评论通知 (type = 3) ---
+        com.creation.platform.entity.Artwork artwork = artworkMapper.selectById(comment.getArtworkId());
+        if (artwork != null) {
+            Long receiverId = artwork.getUserId(); // 默认通知作品作者
+            if (comment.getParentId() != null) {
+                Comment parentComment = this.getById(comment.getParentId());
+                if (parentComment != null) {
+                    receiverId = parentComment.getUserId(); // 楼中楼回复通知被回复的人
+                }
+            }
+            notificationService.sendNotification(receiverId, userId, 3, artwork.getId(), comment.getContent());
+        }
+
         return comment.getId();
     }
 
